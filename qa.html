@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>盛付通聚合支付与分账联调 · AI 问答助手</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* ===== 主色板：与 shengpay-debug 调试台保持一致 ===== */
+    --primary:#1677ff;
+    --primary-hover:#4096ff;
+    --bg:#f5f7fa;
+    --card:#ffffff;
+    --text:#262626;
+    --text-sec:#595959;
+    --text-dis:#8c8c8c;
+    --border:#e8e8e8;
+    --border-input:#d9d9d9;
+    --ok:#389e0d;
+    --err:#d4380d;
+    /* ===== 语义别名：沿用原变量名，便于全站引用 ===== */
+    --paper:var(--bg);
+    --ink:var(--text);
+    --ink-soft:var(--text-sec);
+    --ink-faint:var(--text-dis);
+    --navy:var(--primary);
+    --navy-soft:var(--primary-hover);
+    --accent:var(--primary);
+    --accent-soft:#e6f4ff;
+    --line:var(--border);
+    --line-strong:var(--border-input);
+    --hl:#fff1b8;
+    --hint:#f6f8fa;
+    --mono:"DM Mono","SFMono-Regular",Consolas,"Courier New",monospace;
+    --serif:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+    --sans:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:var(--sans);
+    background:var(--bg);
+    color:var(--text);
+    line-height:1.7;
+    min-height:100vh;
+  }
+  ::selection{background:#bae0ff;color:#262626;}
+  /* ============ header（对齐调试台顶栏：白底 + 蓝色标识 + 1px 分隔线） ============ */
+  header{
+    background:var(--card);
+    color:var(--text);
+    padding:14px 0;
+    position:sticky;top:0;z-index:10;
+    border-bottom:1px solid var(--border);
+  }
+  .head-inner{
+    max-width:1180px;margin:0 auto;padding:0 40px;
+    box-sizing:border-box;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  }
+  .head-tag{
+    order:2;margin-left:auto;
+    display:inline-flex;align-items:center;gap:8px;
+    font-family:var(--mono);font-size:11px;letter-spacing:.16em;
+    color:var(--text-dis);text-transform:uppercase;
+  }
+  .head-tag::before{content:"";width:6px;height:6px;background:var(--primary);border-radius:50%;}
+  h1{
+    order:1;
+    font-family:var(--sans);
+    font-size:18px;
+    font-weight:700;letter-spacing:0;
+    color:var(--primary);
+    display:flex;align-items:center;flex-wrap:wrap;
+  }
+  h1 .ver{
+    font-family:var(--mono);font-size:11px;font-weight:400;
+    color:var(--text-dis);letter-spacing:.04em;
+    border:1px solid var(--border);border-radius:3px;padding:1px 7px;margin-left:10px;
+  }
+  /* ============ layout ============ */
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 40px 72px;display:grid;grid-template-columns:236px 1fr;gap:24px;align-items:start;}
+  /* sidebar */
+  aside{position:sticky;top:72px;}
+  .side-block{
+    background:var(--card);border:1px solid var(--line);border-radius:8px;
+    padding:16px 12px;margin-bottom:16px;
+  }
+  .side-title{
+    font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--ink-faint);
+    text-transform:uppercase;margin-bottom:10px;padding:0 8px 10px;border-bottom:1px solid var(--line);
+  }
+  .cat-btn{
+    display:flex;align-items:center;justify-content:space-between;
+    width:100%;text-align:left;
+    background:none;border:none;cursor:pointer;
+    font-family:var(--sans);font-size:14px;color:var(--ink-soft);
+    padding:9px 10px;border-radius:6px;transition:background .15s,color .15s;
+    border-left:3px solid transparent;
+  }
+  .cat-btn:hover{background:var(--bg);color:var(--ink);}
+  .cat-btn.active{background:var(--accent-soft);color:var(--primary);border-left-color:var(--primary);}
+  .cat-btn .n{font-family:var(--mono);font-size:11px;color:var(--ink-faint);}
+  .cat-btn.active .n{color:var(--primary);}
+  .stat-line{font-size:12.5px;color:var(--ink-faint);padding:3px 10px;}
+  .stat-line b{color:var(--primary);font-family:var(--mono);}
+  .doc-src{font-size:12px;color:var(--ink-faint);line-height:1.6;padding:0 10px;}
+  .doc-src code{font-family:var(--mono);font-size:11px;color:var(--primary);word-break:break-all;}
+  /* main */
+  .searchbar{
+    display:flex;gap:10px;margin-bottom:18px;
+  }
+  .searchbar input{
+    flex:1;
+    font-family:var(--sans);font-size:14px;
+    padding:13px 18px;
+    background:var(--card);
+    border:1px solid var(--line-strong);
+    border-radius:6px;
+    color:var(--ink);
+    outline:none;
+    transition:border .2s, box-shadow .2s;
+  }
+  .searchbar input:focus{border-color:var(--primary);box-shadow:0 0 0 2px rgba(22,119,255,.12);}
+  .searchbar input::placeholder{color:var(--ink-faint);}
+  .searchbar button{
+    font-family:var(--sans);font-size:14px;font-weight:500;letter-spacing:0;
+    background:var(--primary);color:#fff;
+    border:1px solid var(--primary);border-radius:6px;cursor:pointer;
+    padding:0 28px;
+    transition:background .15s, border-color .15s;
+  }
+  .searchbar button:hover{background:var(--navy-soft);border-color:var(--navy-soft);}
+  .searchbar button:active{background:#0958d9;border-color:#0958d9;}
+  .suggests{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px;}
+  .suggests .lab{font-size:12.5px;color:var(--ink-faint);align-self:center;margin-right:2px;}
+  .chip{
+    font-family:var(--sans);font-size:13px;color:var(--ink-soft);
+    background:var(--card);
+    border:1px solid var(--line-strong);
+    border-radius:6px;
+    padding:5px 12px;cursor:pointer;
+    transition:all .15s;
+  }
+  .chip:hover{background:var(--accent-soft);border-color:var(--primary);color:var(--primary);}
+  /* answer cards */
+  .qmeta{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    font-size:13px;color:var(--ink-faint);margin-bottom:14px;
+  }
+  .qmeta .badge{
+    font-family:var(--mono);font-size:11px;
+    background:var(--accent-soft);color:var(--primary);
+    padding:2px 10px;border-radius:3px;letter-spacing:.05em;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-left:3px solid var(--primary);
+    border-radius:8px;
+    padding:22px 26px 20px;
+    margin-bottom:16px;
+    animation:rise .4s ease both;
+    box-shadow:0 1px 2px rgba(0,0,0,.03);
+  }
+  .card.top{border-color:#bae0ff;border-left-color:var(--primary);box-shadow:0 4px 16px rgba(22,119,255,.10);}
+  @keyframes rise{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+  .card-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px;}
+  .card-sec{
+    font-family:var(--mono);font-size:11px;color:#fff;background:var(--primary);
+    padding:3px 9px;border-radius:3px;letter-spacing:.05em;flex:none;
+  }
+  .card.top .card-sec{background:var(--primary);}
+  .card-title{font-family:var(--sans);font-size:17px;font-weight:700;color:var(--ink);letter-spacing:0;}
+  .card-q{font-size:13px;color:var(--ink-faint);margin-bottom:12px;}
+  .card-q .mark{color:var(--primary);font-weight:600;}
+  .card-body{font-size:14px;color:var(--ink-soft);}
+  .card-body b{color:var(--ink);font-weight:600;}
+  .card-body p{margin-bottom:8px;}
+  .card-body ul{margin:6px 0 10px 2px;list-style:none;}
+  .card-body li{
+    position:relative;padding-left:16px;margin-bottom:6px;
+  }
+  .card-body li::before{
+    content:"";position:absolute;left:2px;top:.68em;
+    width:5px;height:5px;background:var(--primary);border-radius:50%;
+  }
+  .card-body code{
+    font-family:var(--mono);font-size:12.5px;
+    background:var(--hint);border:1px solid var(--line);
+    border-radius:3px;padding:1px 6px;color:#d6336c;word-break:break-all;
+  }
+  .card-body .warn{
+    display:block;background:#fffbe6;border:1px solid #ffe58f;border-left:3px solid #faad14;
+    border-radius:6px;padding:9px 12px;font-size:13px;color:#ad6800;margin:8px 0;
+  }
+  .card-body table{width:100%;border-collapse:collapse;margin:8px 0 10px;font-size:13.5px;}
+  .card-body th{
+    background:#fafafa;color:var(--ink-soft);font-weight:600;text-align:left;
+    border:1px solid var(--line);padding:7px 10px;white-space:nowrap;
+  }
+  .card-body td{border:1px solid var(--line);padding:7px 10px;vertical-align:top;}
+  mark{background:var(--hl);color:inherit;padding:0 2px;border-radius:2px;}
+  .related{
+    margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
+    display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  }
+  .related .lab{font-size:12px;color:var(--ink-faint);margin-right:2px;}
+  .empty{
+    background:var(--card);border:1px dashed var(--line-strong);border-radius:8px;
+    padding:44px 30px;text-align:center;color:var(--ink-faint);font-size:14px;
+  }
+  .empty .big{font-family:var(--sans);font-size:18px;font-weight:700;color:var(--ink-soft);margin-bottom:10px;}
+  .hero{
+    background:var(--card);border:1px solid var(--line);border-radius:8px;
+    padding:30px 34px 26px;
+  }
+  .hero h2{font-family:var(--sans);font-size:20px;font-weight:700;margin-bottom:12px;color:var(--ink);}
+  .hero h2::after{content:"";display:block;width:42px;height:3px;border-radius:2px;background:var(--primary);margin-top:10px;}
+  .hero p{font-size:14px;color:var(--ink-soft);margin-bottom:10px;}
+  .flowline{
+    display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+    margin-top:16px;font-size:13px;
+  }
+  .flowline span.step{
+    background:var(--accent-soft);color:var(--primary);padding:6px 14px;border-radius:6px;
+    font-weight:500;letter-spacing:0;
+  }
+  .flowline i{
+    color:var(--ink-faint);font-style:normal;font-size:14px
+  }
+  footer{
+    border-top:1px solid var(--line);
+    padding:20px 40px;
+    font-size:12px;color:var(--ink-faint);
+    text-align:center;
+    background:var(--card);
+  }
+  footer b{color:var(--ink-soft);}
+  @media (max-width:900px){
+    .wrap{grid-template-columns:1fr;padding:20px;}
+    aside{position:static;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    header{padding:12px 0;}
+    .head-inner{padding:0 20px;}
+    h1{font-size:16px;}
+    .head-tag{display:none;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="head-inner">
+    <div class="head-tag">SHENGPAY · INTEGRATION ASSISTANT</div>
+    <h1>盛付通聚合支付与分账联调 AI 问答<span class="ver">V1.1.2</span></h1>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside>
+    <div class="side-block">
+      <div class="side-title">知识分类</div>
+      <div id="catNav"></div>
+    </div>
+    <div class="side-block">
+      <div class="side-title">知识库概况</div>
+      <div class="stat-line">知识条目 <b id="kbCount">0</b> 条</div>
+      <div class="stat-line">分类 <b id="catCount">0</b> 个</div>
+      <div class="doc-src" style="margin-top:10px;">来源文档<br><code>盛付通聚合支付与分账联调指引V1.1.2.docx</code></div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="searchbar">
+      <input id="q" type="text" placeholder="例如：分账为什么提示「非分账订单」？ / 签名怎么拼？ / 退款到账要多久？" autocomplete="off">
+      <button id="askBtn">问 AI</button>
+    </div>
+    <div class="suggests" id="suggests"></div>
+    <div id="results"></div>
+  </main>
+</div>
+
+<footer>本助手内容整理自《盛付通聚合支付与分账联调指引 V1.1.2》，仅供联调接入参考；具体规则以盛付通官方文档与技术支持确认为准。</footer>
+
+<script>
+/* ================= 知识库 ================= */
+const CATS = [
+  {id:"all",  name:"全部",   icon:"◈"},
+  {id:"prep", name:"联调准备", icon:"①"},
+  {id:"open", name:"商户开户", icon:"②"},
+  {id:"auth", name:"认证",   icon:"③"},
+  {id:"pay",  name:"支付",   icon:"④"},
+  {id:"refund",name:"退款",  icon:"⑤"},
+  {id:"share",name:"分账",   icon:"⑥"},
+  {id:"fund", name:"提现·对账·费率", icon:"⑦"},
+  {id:"ops",  name:"平台运营", icon:"⑧"},
+];
+const KB = [
+  /* ---------- 批次1：联调准备 + 开户 ---------- */
+  {id:"prep-flow", cat:"prep", sec:"§1/§4", title:"接入流程与产品概述",
+   q:["流程","概述","目的","上线","商务","生产验证","结算给商户","接入流程","怎么接入","对接流程","对接步骤","五步流程","商务流程","生产验证不通过","产品怎么运作","盛付通是什么"],
+   body:`<p>盛付通合作伙伴拓展并管理商户，实现商户通过<b>微信、支付宝、银联云闪付</b>完成收款，由盛付通将交易款结算给商户。</p><ul><li>收单资金结算路径：收单完成 → 调用<b>分账接口</b>将资金分到商户在盛付通的支付账户 → 通过<b>提现接口</b>将余额提现至商户结算银行卡。</li></ul><p>从商务沟通到商户上线共 5 步：</p><div class="flowline"><span class="step">需求沟通</span><i>→</i><span class="step">合同签署</span><i>→</i><span class="step">商户开户</span><i>→</i><span class="step">技术对接</span><i>→</i><span class="step">上线及生产验证</span></div><span class="warn">生产验证时商务流程及产品配置（如风控止出限制等）必须完成，否则生产验证不通过。</span>`},
+
+  {id:"prep-accounts", cat:"prep", sec:"§5.1.2", title:"三类账户解释（基本户 / 待结算 / 待分账）",
+   q:["基本户","收单待结算账户","待分账账户","账户","余额","D1","D+1","结算","账户区别","三个账户","钱到哪了","资金走向","结算路径","待结算账户是什么","基本户是什么","收单款在哪"],
+   body:`<table><tr><th>账户</th><th>用途</th></tr><tr><td><b>基本户</b></td><td>存放商户收单且结算完成的款项，商户可见余额且可支取</td></tr><tr><td><b>收单待结算账户</b></td><td>存放商户收单款项（D1 结算，查询接口可见），D1 结算后依据支付订单标识结算至基本户或待分账账户</td></tr><tr><td><b>待分账账户</b></td><td>存放待分账款项，商户发起分账指令后资金到基本户</td></tr></table>`},
+
+  {id:"prep-login", cat:"prep", sec:"§5.1.1", title:"商户中心登录与账号获取",
+   q:["登录","商户中心","账号","密码","开户邮件","b.shengpay","商户中心怎么登录","忘记密码","忘记账号","开户信","登录不了","账号在哪获取"],
+   body:`<ul><li>登录地址：<code>https://b.shengpay.com</code></li><li>用户名和密码见<b>开户邮件</b>（接收开户信邮箱见协议或咨询盛付通 BD）。</li></ul>`},
+
+  {id:"prep-pubkey", cat:"prep", sec:"§5.1.3", title:"上传 RSA 公钥要求",
+   q:["公钥","RSA","密钥","上传","1024","私钥","泄露","重置","签名","公钥格式","公钥怎么上传","密钥重置","公钥报错","不能有换行空格","私钥丢了怎么办","密钥管理","生成公钥"],
+   body:`<ul><li>路径：账户管理→账户设置→密钥管理→RSA1024 公钥（旧版）；账户中心→账号基本管理→密钥管理→RSA1024 公钥（新版）。</li><li>密钥长度必须为 <b>1024</b>，符合 RSA 公私钥规则，非随意编写。</li><li>上传公钥必须符合要求：<b>无换行和空格</b>。</li></ul><span class="warn">若公钥上传错误或私钥遗失、泄露需要重置，需盛付通人工介入处理，风控会致电贵司法人确认！</span>`},
+
+  {id:"prep-sign", cat:"prep", sec:"§5.2", title:"签名方式与加签规则",
+   q:["签名","SHA1WithRSA","排序","拼接","验签","sign","加签串","空字段","怎么签名","签名规则","SHA1","RSA签名","加签串怎么拼","签名错误","验签失败","空值不签名","怎么验签","签名算法"],
+   body:`<ul><li>签名算法：<code>SHA1WithRSA</code></li><li>排序拼接：除 <code>sign</code> 字段外，按<b>首字母顺序排序</b>，以 <code>key1=value1&amp;key2=value2&amp;key3=value3...</code> 形式组装加签串。</li><li><b>value 为空的字段不参与签名</b>。</li><li>签名示例：<code>https://docs.shengpay.com/接口规则/签名介绍/</code></li></ul>`},
+
+  {id:"prep-keypair", cat:"prep", sec:"§5.3", title:"公私钥交互机制",
+   q:["公私钥","回调","验签","扩展字段","单独提供","商户私钥","回调验签","验签不过","新增字段","回调谁签名","盛付通公钥","回调签名","双方密钥怎么配合"],
+   body:`<ul><li>商户生成一对 RSA1024 公私钥：<b>公钥上传到盛付通</b>，私钥程序中使用；商户用私钥签名，盛付通用公钥验签。</li><li>盛付通生成一对公私钥：回调时盛付通用私钥签名，商户用盛付通公钥验签（盛付通公钥<b>单独提供</b>，避免误传到盛付通）。</li></ul><span class="warn">回调时盛付通接口存在增加字段的情形，建议商户验签时必须支持增加的扩展字段，避免后续新增字段导致验签不过。</span>`},
+
+  {id:"prep-demo", cat:"prep", sec:"§5.4/§5.5", title:"DEMO 下载与密钥生成工具",
+   q:["DEMO","demo","下载地址","密钥生成工具","工具","demo在哪下载","示例代码","开发示例","密钥工具怎么用","DEMO下载"],
+   body:`<ul><li>开发 DEMO 下载：<code>https://docs.shengpay.com/开发DEMO下载/</code></li><li>密钥生成工具见指引文档附件（双击打开文件或另存文件使用）。</li></ul>`},
+
+  {id:"open-api", cat:"open", sec:"§6.1", title:"API 开户要点总览",
+   q:["API开户","开户","进件","businessCode","productSignInfo","terminalInfos","storeName","storeAddress","contactInfo","要点","开户怎么做","开户字段","进件必填","门店名称","门店地址","经营图片","POS上送几台","开户要求","开户说明","开户注意事项"],
+   body:`<ul><li><code>businessCode</code>：数字字母组成，服务商自定义的唯一编号。</li><li><code>contactInfo</code> 中 <code>contactPhone</code> 和 <code>contactEmail</code> 需填写<b>真实有效</b>信息。</li><li><code>productSignInfo</code>：需上送“收单产品列表”<b>全部</b>；有分账需求加“资金产品列表 SHARING”。费率咨询盛付通 BD，不确认时请勿随意上送。</li><li>需使用 POS 机则 <code>terminalInfos</code> 必填：小微商户建议 <code>terminalCount</code> 上送 5，非小微上送 10（默认最大值，超出联系 BD）。</li><li><code>storeName</code> 展示在支付完成页面，不支持无实际意义文案（微信要求）。</li><li><code>storeAddress</code> 需填写详细店铺地址，如“xx街道xx路xx楼宇xx号”（微信要求）。</li><li>经营图片需符合微信标准（参考“线下门店/线下场所”部分）。</li></ul>`},
+
+  {id:"open-bank", cat:"open", sec:"§6.1(8)", title:"结算银行填写规则（小微 / 个体 / 企业）",
+   q:["结算银行","bankAccountInfo","mchBankAccountInfo","对私","对公","财务卡","法人","PERSONAL","INDIVIDUAL","ENTERPRISE","结算银行怎么填","银行信息","结算卡","对私结算","对公结算","财务卡结算","分支行","银行卡怎么填","结算账户类型","小微结算"],
+   body:`<p>总原则：<b>对私结算不填银行名称和分支行，对公必填</b>。</p><table><tr><th>类型</th><th>结算方式</th><th>字段上送</th></tr><tr><td>小微 PERSONAL</td><td>只能对法人结算</td><td>只上送 bankAccountInfo</td></tr><tr><td rowspan="3">个体 INDIVIDUAL</td><td>无对公户，结算法人对私卡</td><td>只上送 bankAccountInfo</td></tr><tr><td>有对公户，结算对公户</td><td>只上送 bankAccountInfo</td></tr><tr><td>结算财务卡（非法人）</td><td>bankAccountInfo 上送财务卡，mchBankAccountInfo 上送对公户或法人卡</td></tr><tr><td rowspan="2">企业 ENTERPRISE</td><td>结算对公户</td><td>只上送 bankAccountInfo</td></tr><tr><td>结算财务或法人</td><td>bankAccountInfo 上送财务/法人卡，mchBankAccountInfo 上送对公户</td></tr></table>`},
+
+  {id:"open-withdraw", cat:"open", sec:"§6.1(9)", title:"autoWithdraw 自动出款怎么选",
+   q:["autoWithdraw","自动出款","委托出款","七点半","Y","N","提现接口","自动出款怎么选","自动打款","第二天七点半","选Y还是N","委托结算","出款方式选什么","自动结算出款"],
+   body:`<ul><li>若通过<b>提现接口</b>提现，开户时建议 <code>autoWithdraw</code> 选 <b>N</b>，避免提现和委托出款同时使用增加对账困扰。</li><li>若选 Y：结算完成后，盛付通<b>第二天上午七点半</b>自动出款到对应银行卡。</li></ul>`},
+
+  {id:"open-signmode", cat:"open", sec:"§6.1(12-14)", title:"电子合同签约方式 signMode",
+   q:["signMode","签约","电子合同","短信","E","ME","P","signSms","止出","打款","签约方式是什么","电子签约","止出原因","没收到签约短信","打款签约","签约失败","未签约","电子合同怎么签"],
+   body:`<ul><li><code>signMode=E</code>：向 contactPhone 发送电子合同签约短信。<b>未收到或收到“未签约”，账户会止出</b>，资金不会出款到银行账户；可通过“电子合同查询”查签约状态和短信内容。</li><li><code>signSms</code>：是否发送签约短信，默认 Y；上送 N 时即使 signMode=E 也不发短信，需代理商调接口或登录盛付通或联系客服获取。</li><li><code>signMode=ME</code>：非小微商户支持<b>商户打款形式</b>签约电子合同。</li><li><code>signMode=P</code>：API 纯开户（非收单商户）使用。</li></ul>`},
+
+  {id:"open-image", cat:"open", sec:"§6.1.1", title:"开户图片上传",
+   q:["图片上传","mediaId","multipart","file","图片","图片怎么上传","图片类型","mediaId怎么拿","图片审核","经营图片"],
+   body:`<ul><li>请求类型为 <code>multipart/form-data</code>，file 为本地文件。</li><li>请求返回的 <code>mediaId</code> 在 API 开户时使用。</li></ul>`},
+
+  {id:"open-contract", cat:"open", sec:"§6.1.3", title:"电子合同查询和下载",
+   q:["电子合同查询","下载","纸质合同","pdf","签约状态","合同查询","合同下载","纸质合同打印","签约状态查询","合同没签","合同怎么下载","查签约"],
+   body:`<ul><li>接口：<code>https://docs.shengpay.com/商户进件/电子合同查询/</code></li><li>可查询电子合同内容或子商户签约状态；<b>若未签约，账户止出，收单款无法结算到指定银行卡</b>。</li><li>子商户需要纸质合同，可下载签约的 PDF 合同并打印。</li></ul>`},
+
+  {id:"open-h5", cat:"open", sec:"§6.2/§6.3", title:"H5 开户与 API 纯开户（只接收资金）",
+   q:["H5开户","纯开户","register","只接收资金","分账接收方","非收单","分账接收方怎么开户","只收款注册","不开收单开户","只接收资金的开户"],
+   body:`<ul><li><b>H5 开户</b>：子商户用于分账产品，<b>不开通任何盛付通产品</b>。若通过提现接口提现 autoWithdraw 选 N，反之 Y。</li><li><b>API 纯开户</b>：使用方式和请求参数同 API 开户，区别是无法开通收单功能、请求地址不同，注意 <code>signMode</code> 上送 <b>P</b>。请求地址：<code>https://mchapi.shengpay.com/merchant/account/register</code></li></ul>`},
+
+  {id:"open-error1", cat:"open", sec:"§6.8", title:"进件报错：商户名称 / 营业执照类",
+   q:["商户名称不正确","营业执照未匹配","统一社会信用代码","营业执照结束日期","营业期限","网纹照不一致","商户名称","执照报错","名称报错","信用代码错","执照过期","营业期限过期","无字号商户","执照照片","营业执照问题"],
+   body:`<ul><li>“<b>商户名称不正确</b>”：营业执照名称与工商网名称不一致。检查商户是否改过名称；若一致，需查看鉴权通道是否返回正确信息。</li><li>“<b>营业执照未匹配到信息</b>”：检查提交的统一社会信用代码是否正确。</li><li>“<b>营业执照结束日期必须大于当前日期</b>”：查询工商网注册的营业期限是否过期或填写错误。</li><li>“网纹照不一致”：核实身份证人像面照片是否清晰、是否上传错误。</li><li>个体户执照名称为“*”/“无字号”/“空”时，<b>商户名称传入营业执照上的经营者名称</b>。</li></ul>`},
+
+  {id:"open-error2", cat:"open", sec:"§6.8", title:"进件报错：账号 / 银行卡 / 法人类",
+   q:["登录账号已被使用","loginAccount","结算银行卡与持卡人身份不一致","三要素","法人名称与营业执照上不一致","注册账号与注册类型不匹配","空格","账号报错","卡报错","法人报错","鉴权","三要素校验","重复注册","持卡人不一致","银行卡鉴权"],
+   body:`<ul><li>“<b>登录账号已被使用</b>”：loginAccount 已在盛付通注册过，更换账号重试（手机号或邮箱）；此字段支持不传。</li><li>“<b>结算银行卡与持卡人身份不一致</b>”：检查卡开户人与提交持卡人是否一致；若一致仍报错，为避开三要素鉴权当天次数限制，请联系盛付通在线客服核实，<b>不要多次提交校验</b>。</li><li>“<b>法人名称与营业执照上不一致</b>”：检查提交法人与执照是否一致；一致仍报错请联系在线客服核实。</li><li>“<b>注册账号与注册类型不匹配</b>”：账号须为手机号或邮箱，检查是否输入了空格。</li><li>联系人手机号必须是该联系人<b>实名过</b>的手机号；小微商户联系人必须是法人本身。</li></ul>`},
+
+  {id:"open-manual", cat:"open", sec:"§6.8(18)", title:"需人工审核的开户情况",
+   q:["人工审核","四要素鉴权","宗教寺庙","有限合伙","事业单位","境外法人","MCC","5094","委托人进件","人工审核情况","审核不通过","寺庙","境外证件","珠宝MCC","人工进件","哪些要走人工"],
+   body:`<ul><li>法人不一致且无法四要素鉴权的<b>宗教寺庙</b>、<b>有限合伙企业</b></li><li>法人人像比对不清晰的<b>事业单位</b></li><li>商户名称和经营者名称一样 / 名称无字号、无法四要素鉴权的<b>个体户</b></li><li>工商四要素鉴权<b>返回无数据</b>的商户</li><li>委托人进件（境外法人证件），风控审核委托授权函</li><li>MCC 为 <b>5094</b>（贵重珠宝、首饰、钟表零售）的收单商户</li></ul>`},
+
+  {id:"open-misc", cat:"open", sec:"§6.8(13-16)", title:"开户其他要点（年龄 / 费率 / 日切 / 二级渠道）",
+   q:["18岁","70岁","年龄","SINGLE_FEE","SINGLE_QUOTA","分账费率","百分比","日切","resellerId","二级渠道","notifyAccount","uboInfos","商户年龄","费率类型","日切时间","受益人25%","渠道归属","短信通知账号","单笔费率","单笔定额"],
+   body:`<ul><li>小微商户年龄必须在 <b>18 岁和 70 岁之间</b>。</li><li>API 开户分账 SHARING 产品支持两种费率：<code>SINGLE_FEE</code>（单笔费率）和 <code>SINGLE_QUOTA</code>（单笔定额），用哪种咨询盛付通 BD。</li><li>合作伙伴平台开户时 SHARING 只支持单笔费率，默认<b>百分比</b>，不清楚时咨询 BD 勿随意填写。</li><li>日切时间根据商户实际业务场景选择，<b>默认 0 点</b>。</li><li>API 开户增加 <code>resellerId</code> 字段支持子商户归属二级渠道。</li><li><code>notifyAccount</code>：是则盛付通发送短信到 contactPhone、邮件到 contactEmail 通知登录账号密码。</li><li><code>uboInfos</code>（受益人，JSON 数组字符串）：直接或间接拥有超过 25% 股权或表决权的自然人。</li><li>注意：<code>terminalInfos</code>、<code>uboInfos</code> 均为 <b>JSON 数组字符串</b>。</li></ul>`},
+  {id:"auth-flow", cat:"auth", sec:"§7.1", title:"微信意愿确认与支付宝实名认证流程",
+   q:["微信意愿确认","支付宝实名","认证","入驻","二维码","扫码","支付前","入驻认证","扫码认证","微信确认","支付宝认证","认证流程","认证二维码","认证没完成","入驻状态"],
+   body:`<p>用户支付前，商家需要完成：<b>微信意愿确认</b>和<b>支付宝实名认证</b>。</p><ul><li>入驻状态查询：查询微信和支付宝认证结果，入驻成功再往下进行。<code>https://docs.shengpay.com/聚合支付/盛付通聚合支付/入驻状态查询/</code></li><li>商户开户意愿/实名审核查询：微信返回<b>二维码图片</b>（img 标签直接加载）；支付宝返回<b>二维码码值</b>（浏览器访问即得图片）。</li><li>商户开户意愿/实名确认查询：上一步扫码认证的最终结果。</li></ul>`},
+  {id:"auth-appid", cat:"auth", sec:"§7.1.4", title:"微信域名和 APPID 绑定",
+   q:["appid","APPID","域名","授权目录","小程序支付","公众号支付","绑定","appid怎么绑定","授权目录","小程序appid","公众号授权目录","appid绑定","微信域名","appid没绑定","微信域名绑定"],
+   body:`<ul><li>接口：<code>https://docs.shengpay.com/聚合支付/盛付通聚合支付/微信域名和appid绑定/</code></li><li><b>微信小程序支付</b>需要绑定 APPID；<b>公众号支付</b>需要绑定 APPID 和授权目录。</li></ul>`},
+  {id:"auth-channel", cat:"auth", sec:"§7.2-7.4", title:"平台 / 渠道 / 盛意旺 APP 三种认证方式",
+   q:["合作伙伴平台","d.shengpay","渠道认证码","盛意旺","APP认证","App Store","安卓","认证码怎么获取","平台认证","渠道码","盛意旺怎么下载","APP下载","iOS下载","安卓下载"],
+   body:`<ul><li><b>合作伙伴平台</b>：<code>https://d.shengpay.com/</code> 授权状态栏查看认证结果；商户查询→搜索→商户详情可绑定 APPID、授权目录。</li><li><b>渠道认证码认证</b>：联系盛付通 BD 或在线客服（每日 9–21 点）协助获取。</li><li><b>盛意旺 APP 认证</b>：iOS 在 App Store 搜“盛意旺”下载；安卓应用市场搜索或扫码，商户登录盛意旺 APP 完成。</li></ul>`},
+  {id:"auth-fail", cat:"auth", sec:"§7.5", title:"认证失败如何处理",
+   q:["认证失败","透传","错误","重新认证","渠道码","认证没过","认证异常","重新扫码","认证修改","认证错误处理","认证失败怎么办","微信认证报错","支付宝认证报错"],
+   body:`<ul><li>认证接口<b>透传</b>微信和支付宝返回的错误，按错误提示处理。</li><li>认证失败可登录 <code>https://d.shengpay.com/</code> 平台商户认证修改，或直接扫<b>渠道码</b>完成认证。</li><li>参考：微信帮助 <code>pay.weixin.qq.com/static/help_guide/register_guide.shtml</code>；支付宝 <code>opendocs.alipay.com/open/03sqzd</code></li></ul>`},
+
+  {id:"pay-mode", cat:"pay", sec:"§8.1.1", title:"API 支付两种发起方式（mchId / subMchId）",
+   q:["mchId","subMchId","代理商","平台商","服务商","子商户","私钥","方式一","方式二","支付用哪个私钥","支付发起方","服务商模式用哪种","子商户模式","谁发起支付","支付主体","签名用哪个私钥"],
+   body:`<ul><li><b>方式一</b>：mchId 固定为代理商/平台商（无收单功能），subMchId 为具体收单商户。支付程序使用 mchId 的私钥，<b>可避免每个子商户登录盛付通配置公钥</b>（推荐）。</li><li><b>方式二</b>：mchId 即子商户，需要每个子商户登录盛付通上传公钥；有开发能力可通过 API 接口配置公钥（接口单独提供）。</li></ul>`},
+  {id:"pay-fields", cat:"pay", sec:"§8.1.1", title:"API 支付字段要点",
+   q:["outTradeNo","timeExpire","extra","openId","isNeedShare","clientIp","sdpAppId","mchShopCode","tradeType","pageUrl","jsapi","预收单","支付参数","字段怎么填","timeExpire怎么设置","extra格式","分账标识","门店对账","支付必填字段","支付字段说明","extra传什么"],
+   body:`<ul><li><code>sdpAppId</code> 不填；<code>outTradeNo</code> 数字字母组成，服务商自定义唯一编号。</li><li><code>timeExpire</code> <b>必传</b>，建议大于当前时间 5 分钟。</li><li><code>pageUrl</code> 间连不支持；<code>tradeType</code> 按业务场景选择；<code>clientIp</code> 填真实地址。</li><li><code>isNeedShare</code>：有分账需求上送 true（需先开通分账合同），false 不分账。</li><li>微信公众号/小程序支付时 <code>extra</code> <b>必传</b>：JSON 字符串，内容为 appId 和 openId。</li><li>支付宝 <code>alipay_jsapi</code> 支付时 <code>extra</code> 必传：JSON 字符串，内容为 openId（用户支付宝 userId）。</li><li><code>mchMemberInfo</code> 自定义：上送合作伙伴平台创建的门店号/门店名，支付完成后展示，便于多门店对账。</li></ul>`},
+  {id:"pay-barcode", cat:"pay", sec:"§8.1.1.1", title:"付款码支付（扫码收款）与码规则",
+   q:["付款码","扫码","收银员","条码","18位","62开头","25~30","OPENID","指定用户付款","扫码收款","被扫","用户付款码","码规则","付款码位数","付款码标准","付款码怎么付","指定付款","扫用户码"],
+   body:`<ul><li>收银员用扫码设备扫用户条码/二维码，商户收银系统提交支付。</li><li>码识别标准：银联=62 开头 19 位数字；微信=18 位纯数字（10–15 开头）；支付宝=25~30 开头、16~24 位数字。</li><li>微信会员营销指定用户付款：先调“微信通过付款码获取 OPENID”，openid 放入预收单 extra。</li><li>支付宝间连不支持指定用户付款，收银完成后支付接口返回支付用户信息，收银系统同步。</li></ul>`},
+  {id:"pay-jsapi", cat:"pay", sec:"§8.1.1.2", title:"微信公众号 / 小程序 JSAPI 支付",
+   q:["JSAPI","公众号","小程序","H5页面","openId获取","wx.login","网页授权","公众号支付怎么接","小程序支付怎么接","jsapi","H5不能jsapi","openId怎么拿","公众号jsapi","小程序jsapi"],
+   body:`<ul><li>JSAPI 支付通过调起微信支付模块完成收款；<b>小程序不能拉起 H5 页面做 jsapi 支付，小程序内只能使用小程序支付</b>。</li><li>获取 OpenID：公众号走微信网页授权；小程序走 <code>wx.login</code>。</li></ul>`},
+  {id:"pay-app", cat:"pay", sec:"§8.1.1.3", title:"APP 支付实现方式",
+   q:["APP支付","webview","alipay_qr","alipay_jsapi","startapp","my.tradePay","tradeNO","user_id","app支付怎么接","APP里怎么收款","唤起支付宝","唤起微信","APP拉起小程序","应用内支付"],
+   body:`<ul><li>间连不支持 APP 支付：<b>微信</b>通过“APP 拉起微信小程序”实现；<b>支付宝</b>通过 alipay_qr 或 alipay_jsapi 实现。</li><li>支付宝 alipay_qr：盛付通同步返回支付宝二维码链接，APP 内用 webview 打开唤起收银台；完成后若未自动回跳，用户可手动切回。</li><li>支付宝 alipay_jsapi：APP 通过 <code>alipays://platformapi/startapp?appId=app_id&amp;page=page_path</code> 唤起支付宝小程序，获取用户 <b>userId</b>（盛付通只支持 user_id，不支持 open_id），支付接口返回 tradeNO 后调用 <code>my.tradePay</code> 唤起收银台。</li></ul>`},
+  {id:"pay-union", cat:"pay", sec:"§8.1.1.4", title:"云闪付支付（银联动态码 / 行业码）",
+   q:["云闪付","upacp_qr","upacp_quick","银联","白名单","userAuthCode","行业码","动态码","银联支付怎么接","云闪付怎么接","白名单报备","银联js","银联行业码怎么接","动态码接入","云闪付支付"],
+   body:`<ul><li>银联动态码 <code>upacp_qr</code>：域名需报备<b>银联白名单</b>；盛付通返回银联二维码链接，云闪付内打开唤起收银台。</li><li>银联行业码 <code>upacp_quick</code>（银联 JS 支付）：同样需白名单。流程：银联获取 userAuthCode → 调盛付通“银联行业码支付获取用户信息”取 userId → 调“预收单接口”取支付信息 → 前端 JS 调起银联支付控件。</li></ul>`},
+  {id:"pay-aggre", cat:"pay", sec:"§8.1.1.5", title:"盛付通聚合码支付（电子屏场景）",
+   q:["聚合码","shengpay_aggre","电子屏","收款码","wx_jsai","wx_lite","一码多付","收款码牌","聚合码怎么用","电子屏支付","聚合收款码","码牌收款"],
+   body:`<ul><li>聚合收款码支持云闪付、微信、支付宝扫码支付，适用于<b>商家自有电子屏</b>场景；二维码随订单信息变化，非固定。</li><li>需开通 <code>upacp_quick</code>、<code>wx_jsai</code>、<code>wx_lite</code>、<code>alipay_jsapi</code> 产品，tradeType 上送 <code>shengpay_aggre</code>。</li></ul>`},
+  {id:"pay-close", cat:"pay", sec:"§8.1.1.6", title:"关单接口使用规则",
+   q:["关单","PAY_INIT","PAY_ING","重复支付","超时","关闭订单","取消订单","支付超时","重复付款怎么办","换单号","关单规则","不能关单","关单接口"],
+   body:`<ul><li>仅<b>微信或支付宝</b>交易才能调用关单；订单状态必须为 <code>PAY_INIT</code> 或 <code>PAY_ING</code>。</li><li>适用场景：支付失败需换单号重发（对原单关单避免重复支付）；下单后用户超时系统不再受理。</li><li><b>关单后注意查询原支付订单状态</b>。</li></ul>`},
+  {id:"pay-fee-query", cat:"pay", sec:"§8.1.3/§8.4", title:"订单手续费查询与手续费计算",
+   q:["手续费","5秒","限流","费率","四舍五入","收单手续费","手续费怎么查","手续费延迟","费率怎么算","手续费怎么算","手续费查不到","手续费为空","订单手续费"],
+   body:`<ul><li>订单手续费数据有处理延迟：支付成功后建议<b>等待 5 秒</b>再查询，避免查到空值。</li><li>避免对同一订单高频重复查询，以免触发限流保护。</li><li>收单手续费 = 收单金额 × 商户签约费率，<b>保留到分，四舍五入</b>。</li></ul>`},
+  {id:"pay-err", cat:"pay", sec:"§8.4", title:"支付常见问题（appid 不匹配 / 广告页 / 撤销）",
+   q:["sub_mch_id","sub_appid","点金计划","广告页面","撤销","交易密码","补齐资料","支付报错","appid不匹配","广告页","点金计划","撤销交易","为什么输密码","支付报错提示","撤销","支付常见问题"],
+   body:`<ul><li>支付前需完成微信和支付宝认证，商户补齐资料后才能交易。</li><li><code>sub_mch_id</code> 与 <code>sub_appid</code> 不匹配：微信支付需绑定 appid，且支付上送的 appid 与绑定一致。</li><li>公众号支付完成显示广告页：需配置<b>微信点金计划</b>。</li><li><b>撤销接口</b>针对“商家扫用户手机二维码”交易：返回失败/超时/状态未知时调用。用户支付失败则关单，支付成功则资金退还用户。</li><li>微信付款码要求输交易密码：参考微信官方 micropay 说明。</li><li>使用盛意旺码牌或 POS 收款且开通了分账产品的商户，收单交易需要分账。</li></ul>`},
+
+  {id:"refund-api", cat:"refund", sec:"§8.2.1", title:"API 退款与补偿退结算（attach）",
+   q:["退款","attach","isComplement","补偿退结算","挂起","余额不足","部分退款","全额退款","退款怎么做","退款挂起","退结算","API退款怎么做","POS退款","平台退款","APP退款","退款失败","退款接口"],
+   body:`<ul><li>支持部分和全额退款。</li><li><code>attach</code> 上送 <code>{"isComplement":"false"}</code>：表示<b>不补偿退结算</b>，余额不足退款失败。</li><li>不上送 attach：余额不足时退款<b>挂起</b>，余额充足后自动退款。</li><li>合作伙伴平台 / 盛意旺 APP 退款均<b>仅支持聚合支付</b>，不支持 POS 银行卡交易退款（APP 退款需配合短信验证码）。</li></ul>`},
+  {id:"refund-180", cat:"refund", sec:"§8.3", title:"180 天以上订单退款（getHisOrder）",
+   q:["180天","getHisOrder","历史订单","acquireOrderNo","老订单退款","超过半年退款","老订单怎么退","历史交易退款","超过180天的订单","180天以上退款","超过180天"],
+   body:`<ul><li>180 天以内可直接调 API 退款接口。</li><li><b>超过 180 天</b>：先调用 <code>https://mchapi.shengpay.com/refund/getHisOrder</code>（字段：mchId、acquireOrderNo、nonceStr、signType、sign），响应成功后再调 API 退款接口。</li></ul>`},
+  {id:"refund-fee", cat:"refund", sec:"§8.4", title:"退款手续费与到账时间",
+   q:["退款手续费","截取","到账","零钱","银行卡","1-3个工作日","实时到账","退款多久到账","退款手续费怎么算","退款到账时间","零钱退款","银行卡退款","退款到账快慢","退款几天到"],
+   body:`<ul><li>退款手续费 =（退款金额 × 收单手续费）/ 收单金额，保留两位小数<b>直接截取</b>；多次退款全额退时最后一笔用减法，保证全额退手续费。</li><li>退款到账：微信零钱 5 分钟内；微信银行卡 1–3 个工作日；支付宝到余额实时；到银行卡以银行实际为准。</li></ul>`},
+  {id:"share-flow", cat:"share", sec:"§9.1", title:"分账流程案例说明（三种退货情景）",
+   q:["分账","流程","案例","供应商","渠道商","导购","回退","退货","7天","分账步骤","分账怎么做","分账操作","分给谁","分账结算时间","待分账什么时候能查","分账例子","分账全流程"],
+   body:`<p>示例：用户 A 消费 1000 元（order1），B 供应商、C 渠道商、D 导购。</p><ul><li>① 分账由 A 发起，A 的公钥已上传盛付通；B、C、D 均已在盛付通正常开户。</li><li>② A 与 B、C、D <b>绑定分账接收方</b>。</li><li>③ D1 结算，<b>凌晨 0:30 后</b>可查询 order1 待分账余额。</li><li>④ 按业务周期发起分账：可一次分给 B、C、D，也可分天分。</li><li>⑤ 通过分账查询或异步通知核实结果。</li><li>⑥ 盛付通结算出款或调提现接口到银行账户，流程结束。</li></ul><span class="warn">情景二（7 天内退货、分账未执行）：直接发起支付退款。<br>情景三（超 7 天、已分账）：先核实 B/C/D 余额是否充足 → 发起<b>分账回退</b>资金原路退回 A → A 再发起支付退款；也可线下处理。</span>`},
+  {id:"share-receiver", cat:"share", sec:"§9.2.1", title:"添加分账接收方",
+   q:["分账接收方","添加接收方","receiver","字符串","绑定分账关系","接收方怎么加","绑定接收方","receiver类型","接收方开户","添加分账接收方"],
+   body:`<ul><li>接口添加分账资金接收方，分账发起方与接收方建立分账关系。</li><li><b>receiver 必须是字符串</b>（常见坑）。</li><li>接收方需已在盛付通正常开户；非收单商户可用 H5 开户 / API 纯开户（只接收资金）。</li></ul>`},
+  {id:"share-amt", cat:"share", sec:"§9.2.2", title:"查询订单待分账金额",
+   q:["待分账金额","sharableAmount","负数","剩余待分","待分账查询","还能分多少","分账余额","负数含义","待分账金额怎么查","可分账金额"],
+   body:`<ul><li>接口查询订单剩余待分金额。</li><li><code>sharableAmount</code> 为<b>负数</b>表示：支付完成、分账完成、未分账回退 → 直接发起支付退款即可。</li></ul>`},
+  {id:"share-exec", cat:"share", sec:"§9.2.3", title:"分账接口要点（时机 / 条数 / 30% / 365天）",
+   q:["分账指令","D+1","凌晨6点","5条","30%","70%","365天","分账合同","10秒","分账时机","分账限制","分账比例","对外30%","分账有效期","分账次数","什么时候能分账","分账30%规则","分账能分几次","分账金额上限"],
+   body:`<ul><li>分账由<b>具体收单商户</b>发起，发起前需上传公钥到盛付通。</li><li>API 支付上送了分账标识但<b>未开通分账合同</b>：资金正常结算，订单无法分账。</li><li>D+1 结算：今天支付，<b>第二天凌晨 6 点后</b>发起分账指令；完成后 10 秒调“分账查询”，或以异步通知判断结果。</li><li>支持多次分账，<b>一次分账不超过 5 条</b>。</li><li>标准分账：一笔订单<b>对外分账金额不超过结算后金额的 30%</b>，剩余 70% 分给商户自身。</li><li>分账只支持 <b>365 天以内</b>的订单；超期后未分账金额的，盛付通在超期后第一天凌晨<b>自动分给商户自身</b>，注意对账。</li></ul>`},
+  {id:"share-refund", cat:"share", sec:"§9.1/§9.2.3", title:"分账后退款：先回退后退款",
+   q:["分账回退","退款顺序","先回退","余额不足","影响其它订单","分账后退货","先回退再退款","回退后退款","分账后怎么退款","回退顺序错了","分账后退钱","退货分账处理"],
+   body:`<ul><li>未分账：直接发起支付退款。</li><li>已分账：<b>先分账回退，后支付退款</b>。</li><li>不发起回退直接支付退款：退的是<b>其它订单的余额</b>，会影响其它待分账订单！</li><li>回退时接收方余额不足会报错，需先核实余额是否充足。</li></ul><span class="warn">顺序不能颠倒：回退 → 支付退款，资金才能原路退回购买用户。</span>`},
+  {id:"share-err", cat:"share", sec:"§9.10", title:"分账常见报错处理",
+   q:["订单未结算","非分账订单","可分账金额不足","分账失败","高频重复","分账报错","未结算报错","订单未结算","金额不足","分账失败怎么办","分账错误提示","异步分账","分账为什么失败"],
+   body:`<ul><li>“<b>订单未结算</b>”：D+1 结算，第二日凌晨 0 点开始结算，稍后再试。</li><li>“<b>非分账订单</b>”：订单支付时未上送分账标识。</li><li>“<b>可分账金额不足</b>”：账户余额不足导致。</li><li>分账失败：根据失败原因修改后发起<b>新的分账指令</b>，请勿盲目高频重复发起。</li><li>API 接口类分账是<b>异步处理</b>，需通过查询接口或异步通知判断结果。</li></ul>`},
+  {id:"share-open", cat:"share", sec:"§9.8", title:"补开分账产品",
+   q:["补开","分账产品","准实时","存量订单","补开产品","分账怎么补开","开通分账产品","分账没开","存量订单","补开分账","分账产品开通"],
+   body:`<ul><li>注册盛付通时未开通分账产品，后续需要可接口补开：<code>https://docs.shengpay.com/商户进件/补开产品/</code></li><li><b>法人认证完成后准实时生效</b>。</li><li>补开后支付交易上送分账标识；认证前的存量订单不需要分账，注意处理订单避免资金不到账。</li></ul>`},
+  {id:"share-other", cat:"share", sec:"§9.3-9.7/§9.9", title:"平台分账 / 自动 / 定时 / 余额分账 / 解冻",
+   q:["自动分账","定时分账","余额分账","解冻剩余资金","合作伙伴平台分账","分账凭证","10分钟","自动分账怎么用","定时分账怎么用","余额分账","解冻","分账凭证","平台分账","解冻是什么","分账凭证下载"],
+   body:`<ul><li><b>合作伙伴平台分账</b>：登录 b.shengpay 操作（需联系盛付通 BD）。</li><li><b>自动分账</b>：分的是结算后的资金；隔天有退款发生请线下退款，不要通过盛付通退款。</li><li><b>API 定时分账</b>：指定分账日期，到期自动执行；建议支付完成 <b>10 分钟后</b>再发起指令。</li><li><b>API 余额分账</b>：不基于支付订单，按待分账账户余额分账。</li><li><b>API 解冻剩余资金</b>：将剩余待分账余额全部解冻给商户自身。</li><li><b>分账凭证下载</b>：下载分账和退分凭证（仅支持订单分账）。</li></ul>`},
+
+  {id:"fund-balance", cat:"fund", sec:"§10", title:"余额查询（商户 / 子商户）",
+   q:["余额查询","商户余额","子商户余额","代理商维度","余额怎么查","余额多少","子商户余额查询","商户余额怎么查","查余额"],
+   body:`<ul><li><b>商户余额查询</b>：商户维度发起指令。</li><li><b>子商户余额查询</b>：代理商维度发起指令，查询子商户余额。</li></ul>`},
+  {id:"fund-withdraw", cat:"fund", sec:"§11.1", title:"API 提现规则",
+   q:["提现","出款","同名","每日汇总","失败重试","先查询余额","提现怎么做","提现失败怎么办","提现到银行卡","同名账户","一天提现几次","出款失败","提现报错","提现规则"],
+   body:`<ul><li>流程：<b>先查询账户余额，再发起提现指令</b>。</li><li>非全量开放功能，是否支持联系盛付通 BD。</li><li>提现返回失败后<b>请勿再次发起</b>，需根据报错信息修改后再发起。</li><li>同一商户<b>禁止一笔支付订单对应一次提现</b>，每日汇总一次提现出款。</li><li>提现银行卡接口只能变更<b>同名银行</b>；报错“银行账户名称不能为空”时需添加 <code>accountName</code>（注册时营业执照商户名称）。</li></ul>`},
+  {id:"fund-outquery", cat:"fund", sec:"§11.4/§11.5", title:"平台提现与出款查询",
+   q:["出款查询","出款状态","商户管理","交易中心","平台提现","钱出款了没","提现进度","出款查哪","出款查询","平台提现怎么操作"],
+   body:`<ul><li>合作伙伴平台提现：登录 b.shengpay 平台。</li><li>出款查询：b.shengpay 商户管理→出款查询；d.shengpay 交易中心→出款查询。</li><li>提现凭证可通过 API 提现凭证下载接口获取。</li></ul>`},
+  {id:"fund-bill", cat:"fund", sec:"§12", title:"对账单下载与对账",
+   q:["对账","账单","每日10点","顺延半小时","下载交易账单","账单下载","对账时间","账单延迟","对账单","对账怎么做","账单什么时候有","账单没下来"],
+   body:`<ul><li><b>API 对账</b>：默认代理商/平台商使用，<b>每日 10 点后</b>开始下载，未获取到每次顺延半小时。接口：<code>https://docs.shengpay.com/商户账单/下载交易账单/</code></li><li>合作伙伴平台：登录 b.shengpay 或 d.shengpay 对账。</li><li>盛意旺 APP：商户登录 APP 对账。</li></ul>`},
+  {id:"fund-rate", cat:"fund", sec:"§13", title:"商户费率查询与变更",
+   q:["费率","调高","调低","7天认证","次日凌晨生效","一天一次","调高费率什么时候生效","费率怎么改","费率短信","调低费率","费率查询","费率变更","费率认证","费率几天生效"],
+   body:`<ul><li>API 费率查询：请勿高频次、实时查询。</li><li><b>调高费率</b>：接口成功后，注册时填写的联系人手机收到短信，<b>法人 7 天内完成认证</b>；认证完成后<b>次日凌晨</b>新费率生效；一天只能修改一次。</li><li><b>调低费率</b>：接口返回成功即生效，无需认证。</li></ul>`},
+
+  {id:"ops-keyset", cat:"ops", sec:"§14", title:"API 配置密钥（子商户公钥）",
+   q:["配置密钥","配置公钥","子商户登录","避免每个子商户","批量配公钥","免登录配密钥","子商户密钥配置","子商户公钥怎么配"],
+   body:`<ul><li>代理商、平台商可通过 API 给子商户配置公钥，<b>避免每个子商户登录盛付通配置</b>（即 API 支付方式一的配套能力，接口单独提供）。</li></ul>`},
+  {id:"ops-quali", cat:"ops", sec:"§15/§17", title:"商户资质更新（过期影响出款）",
+   q:["资质","过期","60天","营业执照更新","法人证照","手持证件照","受益人","每月16日","受益人补充","资质过期","营业执照到期","法人证件过期","受益人补充","60天提醒","止出原因","资质更新","营业执照怎么更新","证件过期更新"],
+   body:`<span class="warn">商户资质过期会影响出款，需定期登录盛付通查看！</span><ul><li>营业执照、法人证照在<b>过期前 60 天</b>入口提示待更新；路径“我的”→“商户信息”。</li><li>营业执照更新需人工审核；法人证照需上传证件住址（无则填实际住址），<b>小微商户需上传手持证件照</b>。</li><li>每月 <b>16 日</b>系统自动向受益人信息不完善或证件过期的企业商户发起补充/更新任务。</li><li>合作伙伴平台 d.shengpay【商户管理】→【资质更新】可查看下属商户需补充信息，支持在线更新或把更新地址发给商户。</li></ul>`},
+  {id:"ops-risk", cat:"ops", sec:"§16", title:"风控事件（调单处理）",
+   q:["风控事件","调单","3个工作日","提交材料","止出","风控","调单","提交材料","3天审核","交易受限","风控调单","风控事件怎么办"],
+   body:`<ul><li>盛付通针对风险交易订单发起<b>调单</b>处理。</li><li>服务商及时登录 d.shengpay 合作伙伴平台，在风控事件中查询商户是否存在调单事件，按要求<b>及时提交材料</b>。</li><li>内部审核 <b>3 个工作日内</b>完成；<b>逾期将影响商户正常交易及出款</b>。</li></ul>`},
+  {id:"ops-notify", cat:"ops", sec:"§6.7", title:"事件通知接收",
+   q:["事件通知","AES","投诉事件","资金事件","资质过期事件","通知接口","投诉通知","风控通知","AES密钥","消息推送","事件通知接口","事件接收"],
+   body:`<ul><li>用于接收服务商拓展子商户相关事件：<b>投诉事件、风控事件、商户资质过期/变更事件、商户资金事件</b>。</li><li>注意 AES 密钥要求；盛付通各业务系统“有消息就通知”，接收方需做好信息处理。</li></ul>`},
+  {id:"ops-pos", cat:"ops", sec:"§20/§21", title:"云订单与 POS 终端接口",
+   q:["云订单","POS","终端查询","终端绑定","终端解绑","收银系统联通","POS接口","终端绑定","终端解绑","云订单","POS联通","POS机怎么连收银系统"],
+   body:`<ul><li><b>云订单</b>：配合 POS 机使用，实现商家收银系统和 POS 机的联通（联系盛付通 BD 获取）。</li><li><b>POS 终端接口</b>：终端查询、终端绑定、终端解绑（联系盛付通 BD 获取）。</li></ul>`},
+];
+/* ================= 问答逻辑 ================= */
+const $=id=>document.getElementById(id);
+const catOf=id=>CATS.find(c=>c.id===id);
+let curCat="all";
+
+function renderCats(){
+  const nav=$("catNav");
+  nav.innerHTML=CATS.map(c=>{
+    const n=c.id==="all"?KB.length:KB.filter(e=>e.cat===c.id).length;
+    return '<button class="cat-btn'+(c.id===curCat?" active":"")+'" data-cat="'+c.id+'"><span>'+c.name+'</span><span class="n">'+n+'</span></button>';
+  }).join("");
+  nav.querySelectorAll(".cat-btn").forEach(b=>b.onclick=()=>{
+    curCat=b.dataset.cat; renderCats();
+    if(curCat==="all") hero(); else browseCat(curCat);
+    window.scrollTo({top:0,behavior:"smooth"});
+  });
+}
+
+$("kbCount").textContent=KB.length;
+$("catCount").textContent=CATS.length-1;
+const SUGGEST=["分账报错「非分账订单」怎么办","签名规则是什么","结算银行卡怎么填","退款多久到账","分账30%规则","APP支付怎么接","180天以上订单怎么退款","调高费率何时生效"];
+$("suggests").innerHTML+='<span class="lab">常见问题：</span>'+SUGGEST.map(s=>'<button class="chip">'+s+'</button>').join("");
+
+document.addEventListener("click",e=>{
+  const c=e.target.closest(".chip");
+  if(c){ $("q").value=c.textContent; ask(); }
+});
+$("askBtn").onclick=ask;
+$("q").addEventListener("keydown",e=>{ if(e.key==="Enter") ask(); });
+
+function norm(s){ return (s||"").toLowerCase().replace(/\s+/g,""); }
+function tokens(q){
+  const set=new Set();
+  (q.toLowerCase().match(/[a-z0-9_\-\.]+/g)||[]).forEach(t=>{ if(t.length>=2) set.add(t); });
+  const cn=norm(q).replace(/[a-z0-9_\-\.]+/g,"");
+  for(let i=0;i<cn.length-1;i++) set.add(cn.slice(i,i+2));
+  return [...set];
+}
+function search(q){
+  const nq=norm(q), tk=tokens(q);
+  return KB.map(e=>{
+    let s=0;
+    e.q.forEach(k=>{ if(nq.includes(norm(k))) s+=6; });
+    const nt=norm(e.title);
+    tk.forEach(t=>{ if(nt.includes(t)) s+=4; });
+    const nb=norm(e.body).replace(/<[^>]+>/g,"");
+    let hits=0; tk.forEach(t=>{ if(nb.includes(t)) hits++; });
+    s+=Math.min(hits,15)*0.4;
+    e.q.forEach(k=>{ const nk=norm(k); tk.forEach(t=>{ if(t.length>=2&&nk.includes(t)) s+=1.2; }); });
+    return {e,s};
+  }).filter(r=>r.s>=2).sort((a,b)=>b.s-a.s);
+}
+function termsFor(q,e){
+  const t=[q];
+  e.q.forEach(k=>{ if(norm(q).includes(norm(k))) t.push(k); });
+  tokens(q).forEach(t2=>{ if(t2.length>=2) t.push(t2); });
+  return [...new Set(t.map(x=>x.trim()).filter(x=>x.length>=2))];
+}
+function highlight(html,terms){
+  if(!terms.length) return html;
+  const parts=html.split(/(<[^>]+>)/g);
+  return parts.map(p=>{
+    if(p.startsWith("<")) return p;
+    let t=p;
+    terms.forEach(w=>{ t=t.split(w).join("<mark>"+w+"</mark>"); });
+    return t;
+  }).join("");
+}
+function cardHTML(e,terms,isTop,idx,q){
+  const cat=catOf(e.cat);
+  const shown=isTop?q:e.q.slice(0,3).join(" / ");
+  const others=isTop?e.q.filter(k=>!norm(q).includes(norm(k))).slice(0,5):e.q.slice(0,4);
+  return '<div class="card'+(isTop?" top":"")+'" style="animation-delay:'+(idx*70)+'ms">'+
+    '<div class="card-head"><span class="card-sec">'+e.sec+' · '+cat.name+'</span><span class="card-title">'+highlight(e.title,terms)+'</span></div>'+
+    '<div class="card-q">'+(isTop?'提问：<span class="mark">':'相关关键词：<span class="mark">')+shown+'</span></div>'+
+    '<div class="card-body">'+highlight(e.body,terms)+'</div>'+
+    (others.length?'<div class="related"><span class="lab">延伸：</span>'+others.map(k=>'<button class="chip">'+k+'</button>').join("")+'</div>':"")
+  +'</div>';
+}
+function ask(){
+  const q=$("q").value.trim();
+  const box=$("results");
+  if(!q){ hero(); return; }
+  const res=search(q).slice(0,3);
+  if(!res.length){
+    box.innerHTML='<div class="empty"><div class="big">未找到直接相关的知识</div>试试更具体的关键词（如「分账」「退款」「signMode」），或点左侧分类浏览全部知识点。</div>';
+    return;
+  }
+  const top=res[0].e, terms=termsFor(q,top);
+  let html='<div class="qmeta"><span class="badge">'+res.length+' 条命中</span>问题：'+q.replace(/</g,"&lt;")+'<span style="margin-left:auto">来源：联调指引 V1.1.2</span></div>';
+  res.forEach((r,i)=>{ html+=cardHTML(r.e,terms,i===0,i,q); });
+  box.innerHTML=html;
+}
+function browseCat(catId){
+  const list=KB.filter(e=>e.cat===catId);
+  const cat=catOf(catId);
+  let html='<div class="qmeta"><span class="badge">'+list.length+' 条</span>分类浏览：'+cat.name+'</div>';
+  list.forEach((e,i)=>{ html+=cardHTML(e,[],false,i,""); });
+  $("results").innerHTML=html;
+}
+function hero(){
+  $("results").innerHTML='<div class="hero"><h2>接入盛付通聚合支付与分账，从这里开始</h2>'+
+  '<p>本助手内置《盛付通聚合支付与分账联调指引 V1.1.2》全部 '+KB.length+' 条知识，支持自然语言提问与分类浏览，答案均标注来源章节。</p>'+
+  '<p>核心链路：开户 → 认证（微信意愿确认 / 支付宝实名）→ 支付 → 分账（D+1）→ 提现出款 → 对账。</p>'+
+  '<div class="flowline"><span class="step">需求沟通</span><i>→</i><span class="step">合同签署</span><i>→</i><span class="step">商户开户</span><i>→</i><span class="step">技术对接</span><i>→</i><span class="step">生产验证</span></div></div>';
+}
+renderCats();
+hero();
+</script>
+</body>
+</html>
