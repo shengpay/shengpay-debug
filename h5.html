@@ -1,0 +1,1726 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>盛意旺 · H5 快捷支付联调工作台</title>
+<style>
+:root{
+  --paper:#FAF6EE; --paper2:#F3EDDF;
+  --card:#FFFFFF;
+  --ink:#232A33; --ink-soft:#5B6472; --ink-faint:#8A93A0;
+  --line:#E4DCCB; --line2:#D3C9B4;
+  --seal:#C2392B; --seal-deep:#9A2A1F; --seal-bg:#FBEFEC;
+  --ok:#2E7D4F; --ok-bg:#EDF6F0;
+  --warn:#9A6B13; --warn-bg:#FBF3E2;
+  --mono:ui-monospace,'Cascadia Code','JetBrains Mono',Consolas,'Courier New',monospace;
+  --serif:'Noto Serif SC','Source Han Serif SC','STZhongsong','STSong','SimSun',serif;
+  --sans:-apple-system,'PingFang SC','Microsoft YaHei','Segoe UI',sans-serif;
+  --inkblock:#22282F; --inkblock-2:#2C333C;
+  --amber:#E4B95E; --amber-soft:#F0D9A6;
+  --radius:10px;
+  --shadow:0 1px 2px rgba(35,42,51,.05),0 6px 24px -12px rgba(35,42,51,.14);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--sans); color:var(--ink); background:var(--paper);
+  font-size:15px; line-height:1.65; min-height:100vh;
+}
+/* 纸面噪点 */
+body::before{
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.55;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.38 0 0 0 0 0.30 0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* 账本装订线 */
+body::after{
+  content:''; position:fixed; top:0; left:0; right:0; height:3px; z-index:60; pointer-events:none;
+  background:repeating-linear-gradient(90deg,var(--seal) 0 26px,transparent 26px 40px);
+  opacity:.35;
+}
+.wrap{position:relative; z-index:1; max-width:1180px; margin:0 auto; padding:0 20px 60px}
+
+/* ============ 顶栏 ============ */
+header.top{
+  padding:44px 0 26px;
+  display:flex; flex-wrap:wrap; align-items:flex-end; gap:18px 28px;
+  border-bottom:2px solid var(--ink);
+}
+.brand h1{
+  font-family:var(--serif); font-weight:900; font-size:clamp(26px,4.2vw,40px);
+  letter-spacing:.06em; line-height:1.2;
+}
+.brand h1 .seal-char{color:var(--seal)}
+.brand .sub{
+  margin-top:8px; font-size:13px; color:var(--ink-soft); letter-spacing:.28em;
+  display:flex; align-items:center; gap:10px;
+}
+.brand .sub::before{content:''; width:26px; height:1px; background:var(--seal)}
+.top-tools{margin-left:auto; display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+.stamp{
+  font-family:var(--serif); font-weight:700; letter-spacing:.35em; text-indent:.35em;
+  border:2px solid var(--seal); color:var(--seal); border-radius:7px;
+  padding:5px 14px 4px; font-size:14px; transform:rotate(-4deg);
+  box-shadow:inset 0 0 0 1.5px #fff, inset 0 0 0 3px rgba(194,57,43,.35);
+  background:rgba(255,255,255,.55); user-select:none;
+}
+.stamp.prod{background:var(--seal); color:#fff; box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.5)}
+.key-badge{
+  font-family:var(--mono); font-size:12px; color:var(--ink-soft);
+  border:1px dashed var(--line2); border-radius:999px; padding:5px 13px;
+  background:var(--card); display:flex; align-items:center; gap:7px; cursor:pointer;
+  transition:border-color .2s;
+}
+.key-badge:hover{border-color:var(--seal)}
+.key-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(46,125,79,.18)}
+
+/* ============ Tabs ============ */
+nav.tabs{
+  display:flex; gap:4px; margin:26px 0 30px; overflow-x:auto;
+  border-bottom:1px dashed var(--line2); padding-bottom:0; scrollbar-width:none;
+}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{
+  appearance:none; border:none; background:none; cursor:pointer;
+  font-family:var(--sans); font-size:15px; color:var(--ink-soft);
+  padding:10px 16px 12px; white-space:nowrap; position:relative;
+  display:flex; align-items:center; gap:8px; letter-spacing:.02em;
+  transition:color .18s;
+}
+nav.tabs button svg{width:17px;height:17px;flex:none;opacity:.75}
+nav.tabs button:hover{color:var(--ink)}
+nav.tabs button.on{color:var(--ink); font-weight:700}
+nav.tabs button.on::after{
+  content:''; position:absolute; left:12px; right:12px; bottom:-1px; height:3px;
+  background:var(--seal); border-radius:2px 2px 0 0;
+}
+main section{display:none}
+main section.on{display:block; animation:fadeSlide .34s cubic-bezier(.2,.7,.3,1)}
+@keyframes fadeSlide{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* ============ 布局 ============ */
+.grid2{display:grid; grid-template-columns:minmax(340px,1fr) minmax(360px,1.06fr); gap:26px; align-items:start}
+@media(max-width:960px){.grid2{grid-template-columns:1fr}}
+
+.panel{
+  background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:24px 24px 20px; position:relative;
+}
+.panel::after{ /* 票据齿孔底边 */
+  content:''; position:absolute; left:14px; right:14px; bottom:-1px; height:0;
+  border-bottom:2px dashed var(--line2);
+}
+.panel + .panel{margin-top:24px}
+.panel-title{
+  font-family:var(--serif); font-weight:700; font-size:17px; letter-spacing:.08em;
+  display:flex; align-items:center; gap:10px; margin-bottom:6px;
+}
+.panel-title::before{content:''; width:4px; height:16px; background:var(--seal); border-radius:2px}
+.panel-desc{font-size:12.5px; color:var(--ink-soft); margin-bottom:18px; line-height:1.7}
+.panel-desc code{font-family:var(--mono); font-size:11.5px; background:var(--paper2); padding:1px 6px; border-radius:4px; color:var(--seal-deep)}
+
+/* ============ 表单 ============ */
+.grp{border:none; margin:20px 0 4px}
+.grp:first-of-type{margin-top:8px}
+.grp > .grp-h{
+  display:flex; align-items:baseline; gap:10px; margin-bottom:12px;
+  border-bottom:1px solid var(--line); padding-bottom:7px;
+}
+.grp-h .no{font-family:var(--serif); font-size:12px; color:var(--seal); letter-spacing:.1em}
+.grp-h .t{font-weight:700; font-size:14px; letter-spacing:.05em}
+.frow{display:grid; grid-template-columns:1fr 1fr; gap:14px 14px; margin-bottom:12px}
+.frow.one{grid-template-columns:1fr}
+@media(max-width:560px){.frow{grid-template-columns:1fr}}
+label.f{display:flex; flex-direction:column; gap:5px}
+label.f > span{font-size:12px; color:var(--ink-soft); letter-spacing:.04em; display:flex; gap:6px; align-items:center}
+label.f > span .req{color:var(--seal); font-weight:700}
+label.f > span .opt{color:var(--ink-faint); font-weight:400}
+input[type=text],input[type=number],select,textarea{
+  font-family:var(--sans); font-size:15px; color:var(--ink);
+  background:#fff; border:1px solid var(--line2); border-radius:7px;
+  padding:9px 11px; width:100%; outline:none; transition:border-color .15s, box-shadow .15s;
+}
+textarea{font-family:var(--mono); font-size:12.5px; line-height:1.6; resize:vertical}
+input:focus,select:focus,textarea:focus{border-color:var(--seal); box-shadow:0 0 0 3px rgba(194,57,43,.1)}
+input::placeholder,textarea::placeholder{color:#B9BFC8}
+.inp-btn{display:flex; gap:8px}
+.inp-btn input{flex:1}
+.hint{font-size:11.5px; color:var(--ink-faint); margin-top:3px}
+.hint.err{color:var(--seal)}
+.amt-wrap{display:flex; gap:8px}
+.amt-wrap select{width:74px; flex:none}
+
+/* 开关 */
+.switch{display:flex; align-items:center; gap:10px; padding:10px 0 2px; cursor:pointer; user-select:none}
+.switch input{display:none}
+.switch .track{width:38px; height:21px; border-radius:99px; background:#D8D2C2; position:relative; transition:background .18s; flex:none}
+.switch .track::after{content:''; position:absolute; top:2.5px; left:3px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .18s}
+.switch input:checked + .track{background:var(--seal)}
+.switch input:checked + .track::after{transform:translateX(16px)}
+.switch .sw-t{font-size:13px}
+.switch .sw-t small{display:block; color:var(--ink-faint); font-size:11.5px}
+
+/* 单选胶囊 */
+.seg{display:flex; gap:8px; flex-wrap:wrap}
+.seg label{cursor:pointer}
+.seg input{display:none}
+.seg .pill{
+  font-size:12.5px; padding:5px 13px; border:1px solid var(--line2); border-radius:99px;
+  color:var(--ink-soft); background:#fff; transition:all .15s; user-select:none;
+}
+.seg input:checked + .pill{background:var(--ink); color:#fff; border-color:var(--ink)}
+
+/* ============ 按钮 ============ */
+.btn{
+  appearance:none; border:none; cursor:pointer; font-family:var(--sans);
+  border-radius:8px; padding:11px 20px; font-size:14.5px; letter-spacing:.03em;
+  display:inline-flex; align-items:center; gap:8px; transition:transform .12s, box-shadow .15s, background .15s;
+}
+.btn svg{width:16px;height:16px}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn-p{background:var(--seal); color:#fff; box-shadow:0 2px 10px -3px rgba(194,57,43,.5)}
+.btn-p:hover{background:var(--seal-deep)}
+.btn-o{background:#fff; color:var(--ink); border:1px solid var(--ink)}
+.btn-o:hover{box-shadow:0 3px 14px -6px rgba(35,42,51,.4)}
+.btn-g{background:transparent; color:var(--ink-soft); border:1px dashed var(--line2); font-size:13px; padding:8px 14px}
+.btn-g:hover{color:var(--seal); border-color:var(--seal)}
+.btn[disabled]{opacity:.45; cursor:not-allowed; transform:none!important}
+.actions{display:flex; gap:12px; flex-wrap:wrap; margin-top:22px; padding-top:18px; border-top:1px dashed var(--line)}
+
+/* ============ 墨色报文块 ============ */
+.ink{
+  background:var(--inkblock); border-radius:9px; padding:16px 16px 14px; position:relative;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06), 0 10px 26px -14px rgba(20,25,32,.6);
+}
+.ink-h{
+  display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;
+}
+.ink-h .tag{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.22em; color:var(--amber);
+  display:flex; align-items:center; gap:7px;
+}
+.ink-h .tag::before{content:'●'; font-size:7px; animation:blink 2.4s infinite}
+@keyframes blink{0%,100%{opacity:.9}50%{opacity:.25}}
+.copy{
+  font-family:var(--mono); font-size:11px; color:#9AA3B0; background:transparent;
+  border:1px solid #414A55; border-radius:5px; padding:3px 10px; cursor:pointer; transition:all .15s;
+}
+.copy:hover{color:var(--amber); border-color:var(--amber)}
+.ink pre, .ink textarea{
+  font-family:var(--mono); font-size:12px; line-height:1.72; color:#C8D3DE;
+  white-space:pre-wrap; word-break:break-all; max-height:340px; overflow:auto;
+}
+.ink textarea{
+  width:100%; background:transparent; border:none; outline:none; resize:vertical; min-height:150px;
+  color:#C8D3DE; font-size:12px;
+}
+.ink .kv{display:flex; gap:10px; padding:7px 0; border-bottom:1px dashed #3A434E; font-family:var(--mono); font-size:12px; align-items:baseline}
+.ink .kv:last-child{border-bottom:none}
+.ink .kv .k{color:#8C96A4; flex:none; min-width:76px}
+.ink .kv .v{color:var(--amber); word-break:break-all; flex:1}
+.note{
+  font-size:12px; color:var(--ink-soft); background:var(--warn-bg); border:1px solid #EAD9AC;
+  border-radius:8px; padding:10px 13px; margin-top:12px; line-height:1.7;
+}
+.note b{color:var(--warn)}
+.note a{color:var(--seal)}
+
+/* 响应区 */
+.resp-ok{border-left:3px solid var(--ok)}
+.resp-err{border-left:3px solid var(--seal)}
+.resp-status{
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.1em; margin-bottom:8px;
+  display:flex; gap:10px; align-items:center; color:#8C96A4;
+}
+.resp-status .s-ok{color:#7BD79B}
+.resp-status .s-err{color:#F09A8E}
+.linkbtns{display:flex; flex-direction:column; gap:10px; margin-top:14px}
+.linkbtn{
+  display:flex; align-items:center; gap:10px; background:var(--seal-bg); border:1px solid #ECC8C1;
+  color:var(--seal-deep); border-radius:8px; padding:11px 14px; cursor:pointer;
+  font-size:13px; text-align:left; transition:all .15s; font-family:var(--mono);
+}
+.linkbtn:hover{background:#F7E3DF; transform:translateY(-1px)}
+.linkbtn svg{width:16px;height:16px;flex:none}
+.linkbtn .u{word-break:break-all; flex:1; font-size:12px}
+
+/* ============ 银行卡列表 ============ */
+.cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(255px,1fr)); gap:14px; margin-top:14px}
+.bankcard{
+  background:linear-gradient(135deg,var(--inkblock),#39424E 60%,#2E3641);
+  border-radius:12px; padding:16px 17px 13px; color:#DDE4EC; position:relative; overflow:hidden;
+  box-shadow:0 10px 22px -12px rgba(25,30,38,.55);
+}
+.bankcard::before{
+  content:''; position:absolute; right:-28px; top:-28px; width:110px; height:110px;
+  border-radius:50%; border:22px solid rgba(228,185,94,.14);
+}
+.bc-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px}
+.bc-bank{font-weight:700; font-size:14.5px; letter-spacing:.04em}
+.bc-type{
+  font-family:var(--mono); font-size:10px; letter-spacing:.14em; color:var(--amber);
+  border:1px solid rgba(228,185,94,.5); padding:2px 8px; border-radius:99px;
+}
+.bc-no{font-family:var(--mono); font-size:16px; letter-spacing:.12em; margin:6px 0 10px; color:#EDF1F5}
+.bc-no .d{color:#6B7684; letter-spacing:0}
+.bc-foot{display:flex; justify-content:space-between; align-items:baseline; border-top:1px dashed #46505C; padding-top:9px}
+.bc-name{font-size:12px; color:#B9C3CF}
+.bc-agr{font-family:var(--mono); font-size:10.5px; color:#8C96A4}
+.bc-agr b{color:#C8D3DE; font-weight:400}
+.empty-tip{color:var(--ink-faint); font-size:13px; text-align:center; padding:26px 0; border:1px dashed var(--line2); border-radius:9px; margin-top:14px}
+
+/* ============ 通知 Tab ============ */
+.notify-list{list-style:none; display:flex; flex-direction:column; gap:0}
+.notify-list li{
+  display:flex; gap:12px; padding:13px 2px; border-bottom:1px dashed var(--line); font-size:13.5px; line-height:1.75;
+}
+.notify-list li:last-child{border-bottom:none}
+.notify-list .n-no{
+  font-family:var(--serif); color:var(--seal); font-weight:700; flex:none;
+  width:26px; height:26px; border:1.5px solid rgba(194,57,43,.4); border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:12px; margin-top:2px;
+}
+.notify-list b{color:var(--ink)}
+.notify-list code{font-family:var(--mono); font-size:12px; background:var(--paper2); padding:1px 6px; border-radius:4px; color:var(--seal-deep)}
+.checkline{display:flex; align-items:center; gap:10px; padding:9px 0; font-size:13.5px; border-bottom:1px dashed var(--line); cursor:pointer; user-select:none}
+.checkline:last-child{border-bottom:none}
+.checkline input{display:none}
+.checkline .box{width:17px;height:17px;border:1.5px solid var(--line2);border-radius:4px;flex:none;position:relative;transition:all .15s}
+.checkline input:checked + .box{background:var(--seal);border-color:var(--seal)}
+.checkline input:checked + .box::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px}
+.checkline input:checked ~ .cl-t{color:var(--ink-faint);text-decoration:line-through}
+
+/* ============ 页脚 ============ */
+footer{
+  margin-top:52px; border-top:2px solid var(--ink); padding-top:20px;
+  display:flex; flex-wrap:wrap; gap:16px 40px; justify-content:space-between; align-items:flex-start;
+}
+footer .f-brand{font-family:var(--serif); font-weight:900; letter-spacing:.2em; font-size:15px}
+footer .f-links{display:flex; flex-direction:column; gap:5px}
+footer .f-links a{font-size:12.5px; color:var(--ink-soft); text-decoration:none; border-bottom:1px dashed transparent; transition:all .15s}
+footer .f-links a:hover{color:var(--seal); border-bottom-color:var(--seal)}
+footer .f-note{font-size:11.5px; color:var(--ink-faint); max-width:420px; line-height:1.8}
+
+/* toast */
+#toast{
+  position:fixed; left:50%; bottom:34px; transform:translateX(-50%) translateY(20px);
+  background:var(--ink); color:#fff; font-size:13.5px; padding:10px 22px; border-radius:99px;
+  opacity:0; pointer-events:none; transition:all .25s cubic-bezier(.2,.7,.3,1); z-index:99;
+  box-shadow:0 10px 30px -8px rgba(20,25,32,.5); letter-spacing:.03em;
+}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+/* 载入动效 */
+header.top > *, nav.tabs{animation:rise .5s cubic-bezier(.2,.7,.3,1) backwards}
+header.top .brand{animation-delay:.02s}
+header.top .top-tools{animation-delay:.12s}
+nav.tabs{animation-delay:.2s}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* 打字机光标 */
+.cursor::after{content:'▌'; color:var(--amber); animation:blink 1s infinite; margin-left:1px}
+
+.spin{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.guide{
+  display:flex; gap:10px; align-items:flex-start;
+  background:var(--warn-bg); border:1px solid #EAD9AC; border-radius:8px;
+  padding:10px 13px; margin:0 0 14px; font-size:12.5px; line-height:1.85; color:var(--warn);
+}
+.guide::before{content:'🔑'; font-size:14px; line-height:1.85}
+.guide .g-body{flex:1; min-width:0}
+.guide .g-title{font-weight:700; margin-bottom:4px}
+.guide .g-row{margin:1px 0}
+.guide .g-row b{color:inherit}
+.guide .g-note{margin-top:4px; opacity:.88}
+.guide.ok{background:var(--ok-bg); border-color:#BFDCCB; color:var(--ok)}
+.guide.ok::before{content:'✓'; font-weight:700}
+details.pubkey{margin-top:18px; border:1px dashed var(--line2); border-radius:9px; background:var(--paper2)}
+details.pubkey summary{cursor:pointer; padding:10px 15px; font-size:13px; color:var(--ink-soft); letter-spacing:.05em; user-select:none}
+details.pubkey summary:hover{color:var(--seal)}
+details.pubkey .pk-body{padding:2px 15px 14px}
+details.pubkey .pk-body p{font-size:12px; color:var(--ink-soft); margin-bottom:8px; line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ===================== 顶栏 ===================== -->
+<header class="top">
+  <div class="brand">
+    <h1>盛意旺 <span class="seal-char">·</span> H5 快捷支付联调工作台</h1>
+    <div class="sub">UNIFIED ORDER / BIND CARD / QUERY / NOTIFY</div>
+  </div>
+  <div class="top-tools">
+    <span class="stamp prod" id="envStamp" title="固定生产环境，无集测">生 产</span>
+    <span class="key-badge" id="keyBadge" title="点击查看内置平台 RSA 公钥">
+      <span class="dot"></span>RSA-1024 公钥已内置
+    </span>
+    <span class="key-badge" id="mchBadge" title="点击前往商户私钥签名管理">
+      <span class="dot" style="background:#B9BFC8;box-shadow:0 0 0 3px rgba(185,191,200,.2)"></span>商户私钥 · 未配置
+    </span>
+  </div>
+</header>
+
+<!-- ===================== Tabs ===================== -->
+<nav class="tabs" id="tabs">
+  <button class="on" data-tab="tab-pay">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+    快捷支付下单</button>
+  <button data-tab="tab-card">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+    绑卡管理</button>
+  <button data-tab="tab-query">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+    会员绑卡查询</button>
+  <button data-tab="tab-notify">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+    绑卡事件通知</button>
+  <button data-tab="tab-key">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+    签名密钥</button>
+</nav>
+
+<main>
+<!-- ===================== TAB 1 支付下单 ===================== -->
+<section class="on" id="tab-pay">
+  <div class="grid2">
+    <!-- 左：表单 -->
+    <div class="panel">
+      <div class="panel-title">创建支付订单 · unifiedorder</div>
+      <div class="guide" id="guide-pay">
+        <div class="g-body">
+          <div class="g-title">调用前两步（须先完成，再操作本页）</div>
+          <div class="g-row">① 打开顶部「<b>签名密钥</b>」页签</div>
+          <div class="g-row">② 粘贴商户私钥（支持 PEM / 纯 Base64，粘贴即自动导入），并选定签名算法（RSA-SHA256 / RSA-SHA1）</div>
+          <div class="g-note">完成前，本页生成的 sign 为占位值、平台验签不通过。</div>
+        </div>
+      </div>
+      <div class="panel-desc">商户创建支付订单，获取预付单 <code>prepayId</code> 与 MWEB 收银台链接，引导用户完成支付。V3 新增 <code>extra</code> 字段：透传 <b>RSA 公钥加密</b>的付款人身份信息（姓名、身份证号）及首次绑卡活体验证开关，仅适用 MWEB 交易。</div>
+
+      <div class="grp">
+        <div class="grp-h"><span class="no">01</span><span class="t">商户信息</span></div>
+        <div class="frow">
+          <label class="f"><span>appId <i class="req">*</i></span><input type="text" id="p-appId" value="1130886448687419392" placeholder="平台分配的应用 ID"></label>
+          <label class="f"><span>mchId <i class="req">*</i></span><input type="text" id="p-mchId" placeholder="商户号"></label>
+          <label class="f"><span>appName 应用名称 <i class="opt">选填·用户录入</i></span><input type="text" id="p-appName" placeholder="接入方APP/网站/小程序名称"></label>
+        </div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-h"><span class="no">02</span><span class="t">订单信息</span></div>
+        <div class="frow">
+          <label class="f"><span>outTradeNo 商户订单号 <i class="req">*</i></span>
+            <span class="inp-btn"><input type="text" id="p-outTradeNo" placeholder="商户侧唯一订单号">
+            <button class="btn btn-g" id="btn-genOrderId" type="button">生成</button></span>
+          </label>
+          <label class="f"><span>totalFee 订单金额 <i class="req">*</i></span>
+            <span class="amt-wrap">
+              <input type="number" id="p-amount" value="0.01" step="0.01" min="0.01">
+              <select id="p-amountUnit"><option value="yuan">元</option><option value="fen">分</option></select>
+            </span>
+            <span class="hint" id="p-amountHint">0.01 元 = 1 分</span>
+          </label>
+          <label class="f"><span>body 商品描述 <i class="req">*</i></span><input type="text" id="p-body" placeholder="商品名称"></label>
+          <label class="f"><span>clientIp 客户端 IP <i class="opt">选填</i></span><input type="text" id="p-clientIp" placeholder="付款方用户客户端IP"></label>
+          <label class="f"><span>timeStart 订单开始时间</span>
+            <span class="inp-btn"><input type="text" id="p-timeStart" placeholder="yyyyMMddHHmmss">
+            <button class="btn btn-g" id="btn-genTime" type="button">生成</button></span>
+            <span class="hint">生成 = 当前时间（timeExpire 自动 +2 小时）；格式以文档为准，可修改</span>
+          </label>
+          <label class="f"><span>timeExpire 订单失效时间 <i class="opt">选填·可修改</i></span><input type="text" id="p-timeExpire" placeholder="yyyyMMddHHmmss"></label>
+          <label class="f"><span>notifyUrl 支付异步通知 <i class="req">*</i></span><input type="text" id="p-notifyUrl" placeholder="https://your-server.com/pay/notify"></label>
+          <label class="f"><span>returnUrl 支付完成跳转 <i class="opt">选填</i></span><input type="text" id="p-returnUrl" placeholder="https://your-server.com/pay/return"></label>
+        </div>
+        <div class="frow one">
+          <label class="f"><span>detail 商品明细 JSON 字符串 <i class="opt">选填·留空不传</i></span>
+            <textarea id="p-detail" spellcheck="false" style="min-height:60px" placeholder='{"goodsDetails":[{"goodsId":"001","goodsName":"矿泉水","quantity":1,"price":100}]}'></textarea>
+            <span class="hint">原样作为字符串参与报文与签名；点「示例」可一键填入模板后修改</span>
+          </label>
+        </div>
+        <div class="actions" style="border-top:none;padding-top:4px;margin-top:0">
+          <button class="btn btn-g" id="btn-detail-demo" type="button">填入 detail 示例</button>
+        </div>
+      </div><div class="grp">
+        <div class="grp-h"><span class="no">03</span><span class="t">付款人信息（仅姓名 / 证件 RSA 加密）</span></div>
+        <div class="frow">
+          <label class="f"><span>unionId 商户侧用户标识 <i class="req">*</i> <i class="opt">明文</i></span><input type="text" id="p-unionId" placeholder="商户用户唯一标识（不加密）"></label>
+          <label class="f"><span>openId <i class="opt">选填·明文</i></span><input type="text" id="p-openId" placeholder="平台用户标识（不加密）"></label>
+          <label class="f"><span>payer.name 付款人姓名 <i class="opt">选填·RSA 加密</i></span><input type="text" id="p-payerName" placeholder="与银行卡预留姓名一致"></label>
+          <label class="f"><span>payer.idNo 身份证号 <i class="opt">选填·RSA 加密</i></span><input type="text" id="p-idNo" placeholder="18 位居民身份证号" maxlength="18"></label>
+          <label class="f"><span>payer.idType 证件类型 <i class="opt">选填</i></span><input type="text" id="p-idType" value="ID_CARD"></label>
+        </div>
+      </div><div class="grp">
+        <div class="grp-h"><span class="no">04</span><span class="t">扩展参数 extra（payer / payRestriction / bindCardEventNotifyUrl）</span></div>
+        <div class="frow">
+          <label class="f"><span>payRestriction.cardType 卡类型限制</span>
+            <select id="p-cardType">
+              <option value="">不限（不传该字段）</option>
+              <option value="CC">CC · 贷记卡（信用卡）</option>
+              <option value="DC">DC · 借记卡（储蓄卡）</option>
+            </select>
+            <span class="hint">V1.2 起统一为 CC / DC，旧值 CR / DR 仍兼容</span>
+          </label>
+          <label class="f"><span>payRestriction.bankCodes 银行编码 <i class="opt">选填</i></span>
+            <input type="text" id="p-bankCodes" placeholder="如 CCB,ICBC（逗号分隔自动转数组）">
+          </label>
+          <label class="f"><span>payRestriction.cardNoSuffixes 卡号后缀 <i class="opt">选填</i></span>
+            <input type="text" id="p-cardNoSuffixes" placeholder="如 1234,5678（逗号分隔自动转数组）">
+          </label>
+          <label class="f"><span>bindCardEventNotifyUrl 绑卡事件通知 <i class="opt">选填</i></span>
+            <input type="text" id="p-bcNotifyUrl" placeholder="https://your-server.com/bindcard/notify">
+          </label>
+        </div>
+        <div class="frow one">
+          <label class="f"><span>extra 序列化形式（文档示例为 JSON 字符串）</span></label>
+          <div class="seg">
+            <label><input type="radio" name="extrapkg" value="string" checked><span class="pill">JSON 字符串（默认）</span></label>
+            <label><input type="radio" name="extrapkg" value="object"><span class="pill">嵌套 JSON 对象</span></label>
+          </div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="p-liveness">
+          <span class="track"></span>
+          <span class="sw-t">payer.needLiveness = "Y" 首次绑卡活体验证<small>开启后 extra.payer.needLiveness 传 "Y"，关闭则不传；身份验证 / 活体产生额外费用，接入前需与产品沟通</small></span>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-p" id="btn-buildPay" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          RSA 加密并生成报文</button>
+        <button class="btn btn-o" id="btn-sendPay" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          发送请求</button>
+        <button class="btn btn-g" id="btn-curlPay" type="button">复制 cURL</button>
+      </div>
+    </div>
+
+    <!-- 右：输出 -->
+    <div>
+      <div class="panel">
+        <div class="panel-title">加密结果</div>
+        <div class="ink" id="cipherBox">
+          <div class="ink-h"><span class="tag">RSA / PKCS#1 v1.5 · BASE64</span></div>
+          <div id="cipherOut"><div class="kv"><span class="k">状态</span><span class="v" style="color:#8C96A4">填写付款人身份后点击「生成报文」</span></div></div>
+        </div>
+        <div class="note" style="display:none" id="chunkNote"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">请求报文（可编辑）</div>
+        <div class="panel-desc">发送前可直接修改字段名 / 增删字段——本页字段结构依据接口介绍推断，<b>请以飞书文档《请求参数》表为准</b>；<code>extra.payRestriction.cardType</code>、<code>extra.bindCardEventNotifyUrl</code>、<code>notifyUrl</code>、<code>returnUrl</code>、<code>outTradeNo / totalFee / body</code>、<code>unionId</code>（明文）、<code>extra.payer</code>（name / idNo RSA 密文 · idType · needLiveness）、<code>extra.payRestriction</code>（cardType / bankCodes / cardNoSuffixes）、<code>extra.bindCardEventNotifyUrl</code>、<code>timeStart / timeExpire</code>、<code>detail</code>、<code>appName / clientIp</code> 为文档字段；<code>nonceStr</code> 自动生成（12 位，参与签名）；<code>tradeType</code> 固定 <b>MWEB</b>（不显示、参与签名与请求）；<code>unionId / openId 明文不加密</code>。</div>
+        <div class="ink">
+          <div class="ink-h"><span class="tag" id="payUrlTag">POST /api/v3/payment/unifiedorder</span><button class="copy" data-copy="payReq">复制 JSON</button></div>
+          <textarea id="payReq" spellcheck="false" placeholder="点击左侧「RSA 加密并生成报文」后显示"></textarea>
+        </div>
+        <div class="note"><b>签名说明</b>：公钥加密仅用于付款人身份信息；<code>sign</code> 由商户私钥生成——在顶部「签名密钥」页导入商户私钥后，本页生成报文时将<b>自动拼接待签串并生成真实 sign</b>（算法与拼接规则可在该页调整，规则以文档为准）。未导入私钥时 sign 为占位值，亦可直接编辑报文填入服务端签名结果。</div>
+      </div>
+
+      <div class="panel" id="paySignPanel" style="display:none">
+        <div class="panel-title">签名详情 <span style="font-size:11px;color:var(--ink-faint);font-weight:400">（待签串可编辑，编辑后点下方按钮重签）</span></div>
+        <div class="ink">
+          <div class="ink-h"><span class="tag">SIGN RAW · 待签串</span><button class="copy" data-copy="paySignRaw">复制</button></div>
+          <textarea id="paySignRaw" spellcheck="false" style="min-height:90px"></textarea>
+        </div>
+        <div class="ink" style="margin-top:10px">
+          <div class="ink-h"><span class="tag" id="paySignAlgo">SIGN</span><button class="copy" data-copy="paySignVal">复制</button></div>
+          <pre id="paySignVal"></pre>
+        </div>
+        <div class="actions" style="border-top:none;padding-top:12px">
+          <button class="btn btn-p" id="btn-resignPay" type="button">用此待签串重新签名并回填报文</button>
+        </div>
+      </div>
+
+      <div class="panel" id="payRespPanel" style="display:none">
+        <div class="panel-title">响应</div>
+        <div class="ink" id="payResp">
+          <div class="ink-h"><span class="tag">RESPONSE</span><span class="resp-status" id="payRespStatus"></span></div>
+          <pre id="payRespBody">…</pre>
+        </div>
+        <div class="linkbtns" id="payLinks"></div>
+        <div class="note" id="corsNote" style="display:none">
+          <b>浏览器直连受限</b>：实测平台对预检 OPTIONS 一律返回 <code>403 Invalid CORS request</code>，浏览器在预检阶段即拦截（Failed to fetch）——<b>请求格式本身无误</b>（POST + application/json + UTF-8，与文档一致；POST 实际响应带 <code>Access-Control-Allow-Origin: *</code>，仅预检被拒）。可行方案：
+          ① 页底「直连方案」下载 <code>start-debug-browser.bat</code>，双击以调试浏览器打开本页后<b>可直接发送并读取响应</b>（推荐，无需代理）；
+          ② 点击「复制 cURL」在终端 / Postman 发送（报文与页面完全一致）；
+          ③ 由商户服务端转发请求（生产正规做法，签名亦应在服务端完成）；
+          ④ 向平台反馈放开预检配置（页底可一键复制反馈文本；修复后浏览器即可正常直连）。
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TAB 2 绑卡管理 ===================== -->
+<section id="tab-card">
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title">银行卡管理页链接 · getUserCardManageUrl</div>
+      <div class="guide" id="guide-card">
+        <div class="g-body">
+          <div class="g-title">调用前两步（须先完成，再操作本页）</div>
+          <div class="g-row">① 打开顶部「<b>签名密钥</b>」页签</div>
+          <div class="g-row">② 粘贴商户私钥（支持 PEM / 纯 Base64，粘贴即自动导入），并选定签名算法（RSA-SHA256 / RSA-SHA1）</div>
+          <div class="g-note">完成前，本页生成的 sign 为占位值、平台验签不通过。</div>
+        </div>
+      </div>
+      <div class="panel-desc">服务端验签后生成 <code>cardManageToken + pkg</code>（默认 15 分钟有效），返回完整 H5 跳转链接。在 App / WebView 中打开后，用户可完成绑卡、查看已绑卡列表或解绑。传入 <code>notifyUrl</code> 可接收绑卡/解绑异步通知；传入 <code>returnUrl</code> 可在操作完成后跳回商户页面。报文自动携带随机 <code>nonceStr</code>（参与签名，无需手填）。</div>
+      <div class="grp">
+        <div class="grp-h"><span class="no">01</span><span class="t">请求参数</span></div>
+        <div class="frow">
+          <label class="f"><span>appId <i class="req">*</i></span><input type="text" id="c-appId" value="1130886448687419392" placeholder="平台分配的应用 ID"></label>
+          <label class="f"><span>mchId <i class="req">*</i></span><input type="text" id="c-mchId" placeholder="商户号"></label>
+          <label class="f"><span>unionId 商户侧用户标识 <i class="req">*</i></span><input type="text" id="c-unionId" placeholder="商户用户唯一标识"></label>
+          <label class="f"><span>openId <i class="opt">选填·空值不参与签名</i></span><input type="text" id="c-openId" placeholder="平台用户标识"></label>
+          <label class="f"><span>notifyUrl 绑卡/解绑通知 <i class="req">*</i></span><input type="text" id="c-notifyUrl" placeholder="https://your-server.com/bindcard/notify"></label>
+          <label class="f"><span>returnUrl 完成后跳回 <i class="opt">选填</i></span><input type="text" id="c-returnUrl" placeholder="https://your-page.com/back"></label>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-p" id="btn-buildCard" type="button">生成报文</button>
+        <button class="btn btn-o" id="btn-sendCard" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          发送请求</button>
+        <button class="btn btn-g" id="btn-curlCard" type="button">复制 cURL</button>
+      </div>
+      <div class="note"><b>签名说明</b>：在顶部「签名密钥」页导入商户私钥后，生成报文时自动计算真实 <code>sign</code> 并展示待签串；未导入时为占位值，可直接编辑右侧报文。</div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="panel-title">请求报文（可编辑）</div>
+        <div class="ink">
+          <div class="ink-h"><span class="tag" id="cardUrlTag">POST /api/v3/quick-sign/getUserCardManageUrl</span><button class="copy" data-copy="cardReq">复制 JSON</button></div>
+          <textarea id="cardReq" spellcheck="false" placeholder="点击左侧「生成报文」后显示"></textarea>
+        </div>
+      </div>
+      <div class="panel" id="cardSignPanel" style="display:none">
+        <div class="panel-title">签名详情 <span style="font-size:11px;color:var(--ink-faint);font-weight:400">（待签串可编辑，编辑后点下方按钮重签）</span></div>
+        <div class="ink">
+          <div class="ink-h"><span class="tag">SIGN RAW · 待签串</span><button class="copy" data-copy="cardSignRaw">复制</button></div>
+          <textarea id="cardSignRaw" spellcheck="false" style="min-height:90px"></textarea>
+        </div>
+        <div class="ink" style="margin-top:10px">
+          <div class="ink-h"><span class="tag" id="cardSignAlgo">SIGN</span><button class="copy" data-copy="cardSignVal">复制</button></div>
+          <pre id="cardSignVal"></pre>
+        </div>
+        <div class="actions" style="border-top:none;padding-top:12px">
+          <button class="btn btn-p" id="btn-resignCard" type="button">用此待签串重新签名并回填报文</button>
+        </div>
+      </div>
+      <div class="panel" id="cardRespPanel" style="display:none">
+        <div class="panel-title">响应</div>
+        <div class="ink" id="cardResp">
+          <div class="ink-h"><span class="tag">RESPONSE</span><span class="resp-status" id="cardRespStatus"></span></div>
+          <pre id="cardRespBody">…</pre>
+        </div>
+        <div class="linkbtns" id="cardLinks"></div>
+        <div class="note" id="cardCorsNote" style="display:none"><b>浏览器直连受限</b>：平台预检 OPTIONS 实测一律 403，浏览器被拦（Failed to fetch），请求格式无误——页底「直连方案」下载 start-debug-browser.bat 双击后可直接发送；或复制 cURL 在终端发送 / 商户服务端转发；平台放开预检后即可正常直连。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TAB 3 绑卡查询 ===================== -->
+<section id="tab-query">
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title">已绑卡列表查询 · queryBindCardList</div>
+      <div class="guide" id="guide-query">
+        <div class="g-body">
+          <div class="g-title">调用前两步（须先完成，再操作本页）</div>
+          <div class="g-row">① 打开顶部「<b>签名密钥</b>」页签</div>
+          <div class="g-row">② 粘贴商户私钥（支持 PEM / 纯 Base64，粘贴即自动导入），并选定签名算法（RSA-SHA256 / RSA-SHA1）</div>
+          <div class="g-note">完成前，本页生成的 sign 为占位值、平台验签不通过。</div>
+        </div>
+      </div>
+      <div class="panel-desc">按用户身份查询已绑定的快捷银行卡列表：服务端验签后以 <code>appId + unionId + 实际商户号</code> 定位会员。<code>cardList</code> 为 <b>JSON 字符串</b>（非数组），验签通过后再解析。本接口仅查询，不引导绑卡/解绑；需用户自行管理银行卡请用「绑卡管理」接口。报文自动携带随机 <code>nonceStr</code>（参与签名，无需手填）。</div>
+      <div class="grp">
+        <div class="grp-h"><span class="no">01</span><span class="t">请求参数</span></div>
+        <div class="frow">
+          <label class="f"><span>appId <i class="req">*</i></span><input type="text" id="q-appId" value="1130886448687419392" placeholder="平台分配的应用 ID"></label>
+          <label class="f"><span>mchId <i class="req">*</i></span><input type="text" id="q-mchId" placeholder="商户号"></label>
+          <label class="f"><span>unionId 商户侧用户标识 <i class="req">*</i></span><input type="text" id="q-unionId" placeholder="商户用户唯一标识"></label>
+          <label class="f"><span>openId <i class="opt">选填·空值不参与签名</i></span><input type="text" id="q-openId" placeholder="平台用户标识"></label>
+          <label class="f"><span>subMchId 子商户号 <i class="opt">服务商模式选填</i></span><input type="text" id="q-subMchId" placeholder="传入时 mchId 须在服务商白名单">
+            <span class="hint">不传 subMchId 即为普通商户模式</span></label>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-p" id="btn-buildQuery" type="button">生成报文</button>
+        <button class="btn btn-o" id="btn-sendQuery" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          发送请求</button>
+        <button class="btn btn-g" id="btn-curlQuery" type="button">复制 cURL</button>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="panel-title">请求报文（可编辑）</div>
+        <div class="ink">
+          <div class="ink-h"><span class="tag" id="queryUrlTag">POST /api/v3/quick-sign/queryBindCardList</span><button class="copy" data-copy="queryReq">复制 JSON</button></div>
+          <textarea id="queryReq" spellcheck="false" placeholder="点击左侧「生成报文」后显示"></textarea>
+        </div>
+      </div>
+      <div class="panel" id="querySignPanel" style="display:none">
+        <div class="panel-title">签名详情 <span style="font-size:11px;color:var(--ink-faint);font-weight:400">（待签串可编辑，编辑后点下方按钮重签）</span></div>
+        <div class="ink">
+          <div class="ink-h"><span class="tag">SIGN RAW · 待签串</span><button class="copy" data-copy="querySignRaw">复制</button></div>
+          <textarea id="querySignRaw" spellcheck="false" style="min-height:90px"></textarea>
+        </div>
+        <div class="ink" style="margin-top:10px">
+          <div class="ink-h"><span class="tag" id="querySignAlgo">SIGN</span><button class="copy" data-copy="querySignVal">复制</button></div>
+          <pre id="querySignVal"></pre>
+        </div>
+        <div class="actions" style="border-top:none;padding-top:12px">
+          <button class="btn btn-p" id="btn-resignQuery" type="button">用此待签串重新签名并回填报文</button>
+        </div>
+      </div>
+      <div class="panel" id="queryRespPanel" style="display:none">
+        <div class="panel-title">响应 · cardList 解析</div>
+        <div class="ink" id="queryResp">
+          <div class="ink-h"><span class="tag">RESPONSE</span><span class="resp-status" id="queryRespStatus"></span></div>
+          <pre id="queryRespBody">…</pre>
+        </div>
+        <div class="linkbtns" id="queryLinks"></div>
+        <div id="cardListWrap"></div>
+        <div class="note" id="queryCorsNote" style="display:none"><b>浏览器直连受限</b>：平台预检 OPTIONS 实测一律 403，浏览器被拦（Failed to fetch），请求格式无误——页底「直连方案」下载 start-debug-browser.bat 双击后可直接发送；或复制 cURL 在终端发送 / 商户服务端转发；平台放开预检后即可正常直连。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TAB 4 事件通知 ===================== -->
+<section id="tab-notify">
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title">绑卡 / 解绑结果异步通知 · 接入要点</div>
+      <div class="panel-desc">调用「H5快捷绑卡管理」时传入 <code>notifyUrl</code>，或在「H5快捷支付收单」的 <code>extra.bindCardEventNotifyUrl</code> 中传入通知地址后，用户在 H5 收银台完成绑卡或解绑时，平台将以 <b>HTTP POST JSON</b> 方式向该地址发送异步通知。</div>
+      <ul class="notify-list">
+        <li><span class="n-no">1</span><span>通知使用<b>平台私钥</b>对报文字段加签，商户须用<b>平台公钥</b>验签后再处理业务。</span></li>
+        <li><span class="n-no">2</span><span>收到通知后<b>必须返回字符串 <code>SUCCESS</code></b>（纯文本、HTTP 200），平台以此判断接收成功；返回其他内容或超时均视为通知失败，<b>当前版本不做自动重试</b>。</span></li>
+        <li><span class="n-no">3</span><span>通知<b>不阻断</b>用户侧绑卡/解绑主流程——即使通知失败，用户操作结果依然有效。</span></li>
+        <li><span class="n-no">4</span><span>卡号仅返回<b>后四位</b>，不返回完整卡号或前六后四。</span></li>
+        <li><span class="n-no">5</span><span>请使用 <b>Map / 字典</b>等对象接收，<b>先验签、再做业务处理</b>，避免固定对象接收导致后续新增字段时验签失败。</span></li>
+      </ul>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="panel-title">服务端应答示例 · Node.js</div>
+        <div class="ink">
+          <div class="ink-h"><span class="tag">NODE · VERIFY &amp; ACK</span><button class="copy" data-copy="notifyCode">复制代码</button></div>
+<pre id="notifyCode" spellcheck="false">// 快捷绑卡事件通知：先验签、再处理，最后纯文本返回 SUCCESS
+const crypto = require('crypto');
+
+app.post('/bindcard/notify', async (req, res) => {
+  const body = req.body;                    // Map/字典式接收，勿映射固定对象
+  const { sign, ...data } = body;
+
+  // 待验签串拼接规则、摘要算法以平台文档为准（示例为字段排序后 JSON 化）
+  const raw = JSON.stringify(sortByKey(data));
+  const ok = crypto.verify(
+    'RSA-SHA256',
+    Buffer.from(raw),
+    PLATFORM_PUBLIC_KEY_PEM,               // 平台公钥（验签用）
+    Buffer.from(sign, 'base64')
+  );
+  if (!ok) return res.status(400).send('FAIL');
+
+  // 验签通过后再处理业务：body.event 为绑卡/解绑事件，
+  // 卡号仅后四位（cardNoLast4），cardType 为 CC(贷记)/DC(借记)
+  await handleBindCardEvent(body);
+
+  res.send('SUCCESS');                      // 必须纯文本 SUCCESS + HTTP 200
+});</pre>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">接入自查清单</div>
+        <div style="margin-top:8px">
+          <label class="checkline"><input type="checkbox"><span class="box"></span><span class="cl-t">notifyUrl / extra.bindCardEventNotifyUrl 已配置且公网可达</span></label>
+          <label class="checkline"><input type="checkbox"><span class="box"></span><span class="cl-t">已内置平台公钥并实现通知验签</span></label>
+          <label class="checkline"><input type="checkbox"><span class="box"></span><span class="cl-t">以 Map / 字典接收报文，先验签后处理业务</span></label>
+          <label class="checkline"><input type="checkbox"><span class="box"></span><span class="cl-t">应答为纯文本 SUCCESS（HTTP 200）</span></label>
+          <label class="checkline"><input type="checkbox"><span class="box"></span><span class="cl-t">已知晓通知失败不重试、不阻断用户主流程</span></label>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TAB 5 签名密钥 ===================== -->
+<section id="tab-key">
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title">商户签名私钥</div>
+      <div class="panel-desc"><b>文档《签名介绍》规则</b>：将集合内<b>非空参数值</b>按参数名 <b>ASCII 码字典序（区分大小写）</b>以 <code>key1=value1&amp;key2=value2…</code> 拼接成 stringA，对 stringA 做 <b>RSA 签名</b>并 <b>Base64 编码</b>赋值给 <code>sign</code>；空值不参与、<code>sign</code> 本身不参与（<code>signType</code> 参与签名）。粘贴或选择商户私钥后<b>自动导入</b>，三个接口生成报文时自动生成真实 sign；未导入时为占位值。支持 <b>PEM（PKCS#8 / PKCS#1）与纯 Base64（DER）</b>三种格式，不支持加密私钥。</div>
+      <div class="grp">
+        <div class="grp-h"><span class="no">01</span><span class="t">私钥 PEM</span></div>
+        <div class="frow one">
+          <label class="f"><span>粘贴 PEM / 纯 Base64 后自动导入，或选择私钥文件</span>
+            <textarea id="mch-pem" spellcheck="false" style="min-height:130px" placeholder="支持三种格式（粘贴完整内容后自动导入）：&#10;① PEM PKCS#8：-----BEGIN PRIVATE KEY-----…&#10;② PEM PKCS#1：-----BEGIN RSA PRIVATE KEY-----…&#10;③ 纯 Base64（DER）：MIIBvQIBADANBgkqhkiG9w0BAQEFAASC..."></textarea>
+            <span class="hint" id="mch-state" style="color:var(--seal)">未导入（sign 将以占位值生成）</span>
+          </label>
+        </div>
+        <div class="actions" style="border-top:none;padding-top:10px">
+          <button class="btn btn-p" id="btn-import-key" type="button">导入私钥</button>
+          <button class="btn btn-g" id="btn-key-file" type="button">选择文件…</button>
+          <input type="file" id="mch-file" accept=".pem,.key,.txt" style="display:none">
+          <button class="btn btn-g" id="btn-clear-key" type="button">清除</button>
+        </div>
+      </div>
+      <div class="grp">
+        <div class="grp-h"><span class="no">02</span><span class="t">签名算法</span></div>
+        <div class="frow">
+          <div class="seg">
+            <label><input type="radio" name="mch-hash" value="SHA-256"><span class="pill">RSA-SHA256（RSA2）</span></label>
+            <label><input type="radio" name="mch-hash" value="SHA-1" checked><span class="pill">RSA-SHA1（RSA）</span></label>
+          </div>
+          <label class="f"><span>signType 报文取值</span><input type="text" id="mch-signtype" value="RSA"></label>
+        </div>
+      </div>
+      <div class="grp">
+        <div class="grp-h"><span class="no">03</span><span class="t">待签串规则（文档《签名介绍》）</span></div>
+        <div class="frow one">
+          <span class="hint" style="line-height:1.9">非空参数值按参数名 <b>ASCII 码字典序（区分大小写）</b>以 <b>key1=value1&amp;key2=value2…</b> 拼接成 stringA；空值不参与、<b>sign 不参与</b>（signType 参与）；extra / detail 等字符串字段按<b>原文</b>拼接；对 stringA 做 RSA 签名并 Base64 编码赋值给 sign。</span>
+        </div>
+      </div>
+      </div>
+      <div class="note"><b>安全提示</b>：私钥仅保存在本页内存中（刷新即清除），不会上传；此方式仅限<b>联调</b>使用，生产环境必须在商户服务端完成签名。待签串拼接规则与算法请以《盛意旺接口文档》签名说明为准，可在生成报文后的「签名详情」中核对待签串。</div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="panel-title">签名试验台</div>
+        <div class="panel-desc">粘贴任意待签串，用已导入的商户私钥快速签名，便于与服务端实现对拍。</div>
+        <div class="ink">
+          <div class="ink-h"><span class="tag" id="mch-try-algo">SIGN · RSA-SHA1 · BASE64</span></div>
+          <textarea id="mch-try-raw" spellcheck="false" style="min-height:110px" placeholder="appId=xxx&amp;amount=1&amp;mchId=2000…"></textarea>
+        </div>
+        <div class="actions" style="border-top:none;padding-top:12px">
+          <button class="btn btn-p" id="btn-try-sign" type="button">立即签名</button>
+        </div>
+        <div class="ink" style="margin-top:12px">
+          <div class="ink-h"><span class="tag">SIGN VALUE</span><button class="copy" data-copy="mch-try-out">复制</button></div>
+          <pre id="mch-try-out">…</pre>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">签名流程说明</div>
+        <div class="panel-desc" style="margin-bottom:0">
+          ① 生成报文时按《签名介绍》规则拼接 stringA：非空参数值按参数名 ASCII 字典序 key=value&amp;…，剔除 sign 与空值（signType 参与），extra / detail 按原文；<br>
+          ② 使用商户私钥对待签串做 RSA-SHA256（或 SHA1）签名，Base64 后写入 <code>sign</code>；<br>
+          ③ 「签名详情」面板展示待签串与签名值，待签串可编辑后重新签名并回填报文；<br>
+          ④ 若平台验签失败，优先核对待签串拼接规则（如 extra 嵌套对象是否参与、空值处理）与算法是否与文档一致。
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ===================== 跨域代理工具 ===================== -->
+<details class="pubkey" id="proxyPanel" open>
+  <summary>直连方案 · 让页面直接 POST 并读取响应 ▸</summary>
+  <div class="pk-body">
+    <p><b>根因（已实测）</b>：平台对一切预检 OPTIONS 一律返回 <code>403 Invalid CORS request</code>，但 POST 本身对任意来源均放行（<code>HTTP 200 + Access-Control-Allow-Origin: *</code>）——仅预检配置矛盾，请求格式无误。<b>方案①（推荐·无需代理）</b>：下载调试启动脚本，双击后自动以「关闭跨域检查」的独立浏览器实例打开本页，页面即可直接发送并读取响应。</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:10px 0 6px">
+      <button class="btn btn-p" id="btn-dl-bat" type="button" style="padding:8px 16px">下载 start-debug-browser.bat</button>
+      <button class="btn btn-g" id="btn-copy-bat" type="button">复制脚本内容</button>
+    </div>
+    <p class="hint">用法：双击 bat 即可（脚本已内置本页路径，放任意位置均可）；自动探测 Chrome / Edge。⚠ 该实例关闭了跨域安全检查、使用独立配置目录，<b>仅限本机联调</b>，请勿用于日常上网或登录其他账号。</p>
+    <p style="margin-top:10px"><b>方案②</b>：点接口页「复制 cURL」在终端 / Postman 发送，或由商户服务端转发（生产正规做法）。</p>
+    <p style="margin-top:10px"><b>方案③（根本解）</b>：向平台反馈预检配置问题（POST 已放行跨域、仅预检被拒，属配置矛盾），修复后无需任何特殊设置：</p>
+    <div style="margin:6px 0 4px"><button class="btn btn-g" id="btn-copy-feedback" type="button">复制平台反馈文本</button></div>
+    <div style="border-top:1px dashed var(--line2);margin-top:14px;padding-top:10px">
+      <p><b>本地代理（备用）</b>：运行 <code>node cors-proxy.js</code> 后把通道切至「本地代理」。</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:8px 0 6px">
+        <div class="seg">
+          <label><input type="radio" name="proxymode" value="direct" checked><span class="pill">直连生产</span></label>
+          <label><input type="radio" name="proxymode" value="proxy"><span class="pill">本地代理</span></label>
+        </div>
+        <input type="text" id="proxyBase" value="http://127.0.0.1:3456" style="max-width:240px">
+        <button class="btn btn-p" id="btn-dl-proxy" type="button" style="padding:8px 16px">下载 cors-proxy.js</button>
+        <button class="btn btn-g" id="btn-copy-proxy" type="button">复制脚本</button>
+      </div>
+      <p class="hint" id="proxyState" style="color:var(--seal)">当前通道：直连生产（浏览器可能被 CORS 拦截）</p>
+    </div>
+  </div>
+</details>
+
+<!-- ===================== 页脚 ===================== -->
+<footer>
+  <div>
+    <div class="f-brand">盛意旺 · 接口文档</div>
+    <div class="f-links" style="margin-top:8px">
+      <a href="https://qcnr5itfne0r.feishu.cn/wiki/BcxewUZNoiNCJhkwO7lcBBFkndb?from=from_copylink" target="_blank" rel="noopener">① H5 快捷支付收单 · unifiedorder</a>
+      <a href="https://qcnr5itfne0r.feishu.cn/wiki/AUG3wYaj7i7cBykkPR3cSzFfnyc?from=from_copylink" target="_blank" rel="noopener">② H5 快捷绑卡管理 · getUserCardManageUrl</a>
+      <a href="https://qcnr5itfne0r.feishu.cn/wiki/SOBrwgzdZiYN4okH5M3cKBUJnuh?from=from_copylink" target="_blank" rel="noopener">③ 快捷绑卡事件通知 · notify</a>
+      <a href="https://qcnr5itfne0r.feishu.cn/wiki/Zd5hwjai1ihXL3ke6gccIpnCneH?from=from_copylink" target="_blank" rel="noopener">④ 会员绑卡查询 · queryBindCardList</a>
+      <a href="https://qcnr5itfne0r.feishu.cn/wiki/IviwwVbtKiyQtRktsmQc4XCnn0c?from=from_copylink" target="_blank" rel="noopener">⑤ 签名介绍 · sign 规则</a>
+    </div>
+  </div>
+  <details class="pubkey" style="max-width:460px">
+    <summary>平台 RSA 公钥（付款人身份信息加密用）▸</summary>
+    <div class="pk-body">
+      <p>用于加密 <b>extra</b> 中透传的付款人身份信息（姓名、身份证号），RSA-1024 / PKCS#1 v1.5 / Base64 输出。超长明文将按 100 字节分块加密并以 <code>|</code> 连接（需与服务端约定一致）。</p>
+      <div class="ink"><div class="ink-h"><span class="tag">PUBLIC KEY · SPKI · 1024-bit</span><button class="copy" data-copy="pkText">复制</button></div><pre id="pkText"></pre></div>
+    </div>
+  </details>
+  <div class="f-note">本页面为商户侧联调工具：仅内置平台<b>公钥</b>（加密付款人身份信息），商户签名（sign）应在商户服务端完成；所有接口请求<b>直连生产环境 wpaw.shengpay.com</b>，涉及真实资金，请谨慎操作。字段结构中未经文档确认的命名请以《盛意旺接口文档》参数表为准。</div>
+</footer>
+
+<div id="toast"></div>
+</div>
+
+<script>
+/* ============================================================
+ * 盛意旺 H5 快捷支付 · 商户联调工作台
+ *  - 内置平台 RSA-1024 公钥（SPKI/DER, PKCS#1 v1.5 加密）
+ *  - 四接口报文构造 / 发送 / cURL 导出
+ * ============================================================ */
+'use strict';
+
+/* ---------- 平台公钥（用户提供） ---------- */
+const PLATFORM_PUB_B64 =
+  'MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCmnlzMPhklUfsN8+enQkXk8vA5fGSGOIp6' +
+  'eHzExL7znaUN3bs9GORbvpPDVis8nWdKpgX6TeFP1L2hsVoNXkWZM2MX3P72HJQYdhcVpzhg' +
+  'Mj3zlW3KI2/HQyns6Ub6yJNGTajXYEqy+qKY3I7EQETMI3vN128182lMaxwLmVikRQIDAQAB';
+
+/* ---------- 接口地址（仅生产环境，无集测） ---------- */
+const ENV = {
+  pay:   'https://wpaw.shengpay.com/api/v3/payment/unifiedorder',
+  card:  'https://wpaw.shengpay.com/api/v3/quick-sign/getUserCardManageUrl',
+  query: 'https://wpaw.shengpay.com/api/v3/quick-sign/queryBindCardList'
+};
+
+/* ---------- 工具 ---------- */
+const $ = id => document.getElementById(id);
+const b64 = u8 => btoa(String.fromCharCode.apply(null, u8));
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+async function copyText(text, tip){
+  try{ await navigator.clipboard.writeText(text); }
+  catch(e){
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+  }
+  toast(tip || '已复制到剪贴板');
+}
+function genOrderId(){
+  const d = new Date(), p = n => String(n).padStart(2,'0');
+  return 'SP' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) +
+         p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) +
+         String(Math.floor(1000 + Math.random()*9000));
+}
+function genNonce(){
+  const cs = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let s = '';
+  for(let i=0;i<12;i++) s += cs[Math.floor(Math.random()*cs.length)];
+  return s;
+}
+function genTimeStr(offsetMin){
+  const d = new Date(Date.now() + (offsetMin || 0) * 60000);
+  const p = n => String(n).padStart(2, '0');
+  return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+}
+function toList(s){
+  const t = s.trim();
+  if(t.startsWith('[')){
+    try{ return JSON.parse(t); }catch(e){ return t; }
+  }
+  return t.split(/[,，;\s]+/).filter(Boolean);
+}
+function toCurl(url, bodyStr){
+  return "curl -X POST '" + url + "' \\\n  -H 'Content-Type: application/json' \\\n  -d '" +
+         bodyStr.replace(/\n\s*/g,'') + "'";
+}
+
+/* ---------- RSA：WebCrypto ---------- */
+let _keyPromise = null;
+function getRsaKey(){
+  if(!window.crypto || !crypto.subtle) return Promise.reject(new Error('no-webcrypto'));
+  if(!_keyPromise){
+    const bin = atob(PLATFORM_PUB_B64);
+    const der = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) der[i] = bin.charCodeAt(i);
+    _keyPromise = crypto.subtle.importKey('spki', der, {name:'RSAES-PKCS1-v1_5'}, false, ['encrypt']);
+  }
+  return _keyPromise;
+}
+/* 纯 BigInt 兜底：解析 SPKI 得 n/e，PKCS#1 v1.5 填充 + 模幂运算
+   （实现已经临时私钥解密端到端验证，与 WebCrypto 产物等价） */
+let _spkiNE = null;
+function parseSpkiNE(){
+  if(_spkiNE) return _spkiNE;
+  const der = Uint8Array.from(atob(PLATFORM_PUB_B64), c => c.charCodeAt(0));
+  let i = -1;
+  for(let idx = 0; idx < der.length - 4; idx++){
+    if(der[idx]===0x02 && der[idx+1]===0x81 && der[idx+2]===0x81 && der[idx+3]===0x00){ i = idx; break; }
+  }
+  if(i < 0) throw new Error('平台公钥 DER 解析失败');
+  const nBytes = der.slice(i+4, i+4+128);
+  const eStart = i + 4 + 128, eLen = der[eStart+1];
+  const hex = u => [...u].map(b=>b.toString(16).padStart(2,'0')).join('');
+  _spkiNE = {n: BigInt('0x'+hex(nBytes)), e: BigInt('0x'+hex(der.slice(eStart+2, eStart+2+eLen)))};
+  return _spkiNE;
+}
+function modPow(b, e, m){
+  let r = 1n; b %= m;
+  while(e > 0n){ if(e & 1n) r = r * b % m; b = b * b % m; e >>= 1n; }
+  return r;
+}
+function rsaEncryptFallback(text){
+  const {n, e} = parseSpkiNE();
+  const K = 128, data = new TextEncoder().encode(text), parts = [];
+  for(let off = 0; off < data.length; off += 100){
+    const m = Array.from(data.slice(off, off+100));
+    const ps = [];
+    while(ps.length < K - 3 - m.length){ let r; do{ r = Math.floor(Math.random()*256); }while(r===0); ps.push(r); }
+    const emBig = BigInt('0x' + [0,2].concat(ps,[0],m).map(b=>b.toString(16).padStart(2,'0')).join(''));
+    const cHex = modPow(emBig, e, n).toString(16).padStart(K*2, '0');
+    parts.push(b64(Uint8Array.from(cHex.match(/../g).map(h=>parseInt(h,16)))));
+  }
+  return {cipher: parts.join('|'), chunks: parts.length};
+}
+/* RSA-1024 PKCS#1 v1.5 单块明文上限 117B，按 100B 分块留余量；
+   优先 WebCrypto，环境不支持（如部分 WebView）时自动切换 BigInt 兜底 */
+async function rsaEncrypt(text){
+  try{
+    const key = await getRsaKey();
+    const bytes = new TextEncoder().encode(text);
+    const CHUNK = 100, parts = [];
+    for(let i=0;i<bytes.length;i+=CHUNK){
+      const ct = await crypto.subtle.encrypt({name:'RSAES-PKCS1-v1_5'}, key, bytes.slice(i, i+CHUNK));
+      parts.push(b64(new Uint8Array(ct)));
+    }
+    return {cipher: parts.join('|'), chunks: parts.length};
+  }catch(err){
+    return rsaEncryptFallback(text);
+  }
+}
+
+/* ---------- 打字机 ---------- */
+function typewriter(el, text, done){
+  el.textContent = ''; el.classList.add('cursor');
+  let i = 0;
+  (function step(){
+    if(i >= text.length){ el.classList.remove('cursor'); done && done(); return; }
+    el.textContent += text[i++];
+    setTimeout(step, 8);
+  })();
+}
+
+/* ---------- Tab 切换 ---------- */
+document.querySelectorAll('#tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#tabs button').forEach(b=>b.classList.remove('on'));
+    document.querySelectorAll('main section').forEach(s=>s.classList.remove('on'));
+    btn.classList.add('on');
+    $(btn.dataset.tab).classList.add('on');
+  });
+});
+
+/* ---------- 环境徽章：固定生产 ---------- */
+const envStamp = $('envStamp');
+envStamp.textContent = '生 产';
+envStamp.classList.add('prod');
+envStamp.title = '固定生产环境，无集测';
+envStamp.addEventListener('click', ()=> toast('固定生产环境 wpaw.shengpay.com，涉及真实资金，请谨慎操作'));
+$('payUrlTag').textContent   = 'POST ' + new URL(ENV.pay).pathname;
+$('cardUrlTag').textContent  = 'POST ' + new URL(ENV.card).pathname;
+$('queryUrlTag').textContent = 'POST ' + new URL(ENV.query).pathname;
+
+/* ---------- 本地跨域代理（修复 Failed to fetch） ---------- */
+const PROXY = { mode: 'direct', base: 'http://127.0.0.1:3456' };
+function apiUrl(kind){
+  const u = ENV[kind];
+  if(PROXY.mode === 'direct') return u;
+  return PROXY.base.replace(/\/+$/, '') + new URL(u).pathname;
+}
+function refreshTags(){
+  const suffix = PROXY.mode === 'proxy' ? ' · 本地代理' : '';
+  $('payUrlTag').textContent   = 'POST ' + new URL(ENV.pay).pathname + suffix;
+  $('cardUrlTag').textContent  = 'POST ' + new URL(ENV.card).pathname + suffix;
+  $('queryUrlTag').textContent = 'POST ' + new URL(ENV.query).pathname + suffix;
+  const st = $('proxyState');
+  if(PROXY.mode === 'proxy'){
+    st.textContent = '当前通道：本地代理 ' + PROXY.base + ' → https://wpaw.shengpay.com（需先 node cors-proxy.js）';
+    st.style.color = 'var(--ok)';
+  }else{
+    st.textContent = '当前通道：直连生产（浏览器可能被 CORS 拦截）';
+    st.style.color = 'var(--seal)';
+  }
+}
+document.querySelectorAll('input[name=proxymode]').forEach(r => r.addEventListener('change', () => {
+  PROXY.mode = r.value;
+  refreshTags();
+  toast(r.value === 'proxy' ? '已切换本地代理通道（需已运行 node cors-proxy.js）' : '已切换直连生产');
+}));
+$('proxyBase').addEventListener('input', () => {
+  PROXY.base = $('proxyBase').value.trim() || 'http://127.0.0.1:3456';
+  refreshTags();
+});
+const CORS_PROXY_JS = [
+  '// cors-proxy.js — 盛意旺接口本地代理（仅本机运行，解决浏览器 CORS 限制）',
+  '// 用法：node cors-proxy.js [端口]    默认端口 3456',
+  'const http = require(\'http\');',
+  'const https = require(\'https\');',
+  'const PORT = Number(process.argv[2]) || 3456;',
+  'const UPSTREAM = { host: \'wpaw.shengpay.com\', port: 443 };',
+  '',
+  'http.createServer(function(req, res){',
+  '  if(req.method === \'OPTIONS\'){',
+  '    res.writeHead(204, {',
+  '      \'Access-Control-Allow-Origin\': \'*\',',
+  '      \'Access-Control-Allow-Methods\': \'GET,POST,OPTIONS\',',
+  '      \'Access-Control-Allow-Headers\': \'*\',',
+  '      \'Access-Control-Max-Age\': \'86400\'',
+  '    });',
+  '    return res.end();',
+  '  }',
+  '  const headers = Object.assign({}, req.headers);',
+  '  delete headers.host; delete headers.origin; delete headers.referer;',
+  '  const up = https.request({',
+  '    hostname: UPSTREAM.host, port: UPSTREAM.port,',
+  '    path: req.url, method: req.method, headers: headers',
+  '  }, function(ur){',
+  '    const h = Object.assign({}, ur.headers);',
+  '    h[\'access-control-allow-origin\'] = \'*\';',
+  '    res.writeHead(ur.statusCode, h);',
+  '    ur.pipe(res);',
+  '  });',
+  '  up.on(\'error\', function(e){',
+  '    res.writeHead(502, {',
+  '      \'Content-Type\': \'application/json; charset=utf-8\',',
+  '      \'Access-Control-Allow-Origin\': \'*\'',
+  '    });',
+  '    res.end(JSON.stringify({ proxyError: String(e && e.message || e) }));',
+  '  });',
+  '  req.pipe(up);',
+  '}).listen(PORT, \'127.0.0.1\', function(){',
+  '  console.log(\'[cors-proxy] http://127.0.0.1:\' + PORT + \'  ->  https://\' + UPSTREAM.host);',
+  '  console.log(\'[cors-proxy] 页面「跨域代理」面板切至「本地代理」后即可直接发送请求（Ctrl+C 退出）\');',
+  '});',
+  ''
+].join('\n');
+$('btn-dl-proxy').addEventListener('click', () => {
+  const blob = new Blob([CORS_PROXY_JS], {type: 'text/javascript'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'cors-proxy.js';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  toast('已下载 cors-proxy.js，运行：node cors-proxy.js');
+});
+$('btn-copy-proxy').addEventListener('click', () => copyText(CORS_PROXY_JS, '脚本已复制，保存为 cors-proxy.js 后运行'));
+
+/* ---------- 直连方案：调试浏览器启动脚本 + 平台反馈文本 ---------- */
+function buildDebugBat(){
+  return [
+    '@echo off',
+    'title H5 QuickPay - Debug Browser (CORS disabled)',
+    'set "PAGE=' + location.href + '"',
+    'set "PROFILE=%TEMP%\\quickpay-cors-debug"',
+    'set "CHROME="',
+    'if exist "%ProgramFiles%\\Google\\Chrome\\Application\\chrome.exe" set "CHROME=%ProgramFiles%\\Google\\Chrome\\Application\\chrome.exe"',
+    'if exist "%ProgramFiles(x86)%\\Google\\Chrome\\Application\\chrome.exe" set "CHROME=%ProgramFiles(x86)%\\Google\\Chrome\\Application\\chrome.exe"',
+    'if exist "%LocalAppData%\\Google\\Chrome\\Application\\chrome.exe" set "CHROME=%LocalAppData%\\Google\\Chrome\\Application\\chrome.exe"',
+    'if not defined CHROME if exist "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe" set "CHROME=%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe"',
+    'if not defined CHROME if exist "%ProgramFiles%\\Microsoft\\Edge\\Application\\msedge.exe" set "CHROME=%ProgramFiles%\\Microsoft\\Edge\\Application\\msedge.exe"',
+    'if not defined CHROME (',
+    '  echo [ERROR] Chrome / Edge not found. Please edit the CHROME path in this script.',
+    '  pause',
+    '  exit /b 1',
+    ')',
+    'start "" "%CHROME%" --disable-web-security --user-data-dir="%PROFILE%" "%PAGE%"',
+    'echo Debug browser started: web security disabled, isolated profile.',
+    'echo ONLY for local API debugging. Do NOT use this instance for daily browsing.',
+    'timeout /t 3 >nul'
+  ].join('\n');
+}
+const FEEDBACK_TEXT = [
+  '【CORS 预检配置问题反馈 · 盛意旺开放接口】',
+  '涉及接口：https://wpaw.shengpay.com/api/v3/*（以 /api/v3/quick-sign/queryBindCardList 为例）',
+  '实测现象（curl 直连生产环境）：',
+  '1) POST（Content-Type: application/json，任意 Origin，包括 Origin: null）→ HTTP 200，响应头带 Access-Control-Allow-Origin: * / Access-Control-Allow-Methods: * / Access-Control-Allow-Headers: Origin,X-Requested-With,Content-Type,Accept —— 实际请求允许跨域；',
+  '2) 但跨域前的预检 OPTIONS（任意 Origin、带或不带 Access-Control-Request-Headers）→ 一律 HTTP 403 "Invalid CORS request"；',
+  '3) 结果：商户 H5 页面（浏览器）在预检阶段即被拦截（Failed to fetch），无法直连调用，与 1) 的跨域放行配置自相矛盾。',
+  '建议：放开 OPTIONS 预检的 CORS 响应（返回与 POST 一致的 Access-Control-Allow-* 头），商户前端即可直连，无需代理或服务端转发。'
+].join('\n');
+$('btn-dl-bat').addEventListener('click', () => {
+  const blob = new Blob([buildDebugBat()], {type: 'application/octet-stream'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'start-debug-browser.bat';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  toast('已下载 start-debug-browser.bat，双击即可以调试模式打开本页');
+});
+$('btn-copy-bat').addEventListener('click', () => copyText(buildDebugBat(), 'bat 内容已复制，保存为 start-debug-browser.bat'));
+$('btn-copy-feedback').addEventListener('click', () => copyText(FEEDBACK_TEXT, '反馈文本已复制，可直接发给平台'));
+
+/* ---------- 公钥展示 ---------- */
+$('pkText').textContent = PLATFORM_PUB_B64;
+$('keyBadge').addEventListener('click', ()=>{
+  document.querySelector('details.pubkey').open = true;
+  document.querySelector('details.pubkey').scrollIntoView({behavior:'smooth'});
+});
+
+/* ---------- 通用复制按钮 ---------- */
+document.querySelectorAll('.copy[data-copy]').forEach(btn=>{
+  btn.addEventListener('click', ()=> copyText($(btn.dataset.copy).value || $(btn.dataset.copy).textContent, '已复制'));
+});
+
+/* ============================================================
+ * 商户签名 · 私钥导入 / 待签串 / RSA-SHA256(SHA1) 签名
+ * ============================================================ */
+const MCH = {
+  der: null, format: '', bits: 0,
+  hash: 'SHA-1',              /* 'SHA-1'（默认） | 'SHA-256' */
+  rawMode: 'doc',             /* doc(文档规则) | deep | json */
+  _keys: {},                  /* hash -> CryptoKey */
+  _stDirty: false
+};
+function mchSignTypeDefault(){ return MCH.hash === 'SHA-256' ? 'RSA2' : 'RSA'; }
+function mchSignTypeVal(){ return $('mch-signtype').value.trim() || mchSignTypeDefault(); }
+
+/* PKCS#1(RSAPrivateKey) → PKCS#8(PrivateKeyInfo) */
+function pkcs1ToPkcs8(p1){
+  const ver = [0x02,0x01,0x00];
+  const alg = [0x30,0x0d,0x06,0x09,0x2a,0x86,0x48,0x86,0xf7,0x0d,0x01,0x01,0x01,0x05,0x00];
+  const L1 = p1.length;
+  if(L1 >= 65536) throw new Error('私钥过大');
+  const oct = [0x04, 0x82, (L1 >> 8) & 0xff, L1 & 0xff];
+  const contentLen = ver.length + alg.length + oct.length + L1;
+  const head = [0x30, 0x82, (contentLen >> 8) & 0xff, contentLen & 0xff];
+  const out = new Uint8Array(head.length + contentLen);
+  let o = 0;
+  out.set(head, o); o += head.length;
+  out.set(ver, o);  o += ver.length;
+  out.set(alg, o);  o += alg.length;
+  out.set(oct, o);  o += oct.length;
+  out.set(p1, o);
+  return out;
+}
+async function importMerchantKey(input){
+  input = (input || '').trim();
+  if(/ENCRYPTED PRIVATE KEY/.test(input)) throw new Error('暂不支持加密私钥（请提供未加密的私钥）');
+  let derB64;
+  if(/-----BEGIN/.test(input)){
+    const m = /-----BEGIN (RSA )?PRIVATE KEY-----([\s\S]+?)-----END (RSA )?PRIVATE KEY-----/.exec(input);
+    if(!m) throw new Error('PEM 头无法识别（支持 PKCS#8 与 PKCS#1）');
+    derB64 = m[2].replace(/\s+/g,'');
+  }else{
+    /* 纯 Base64（DER）格式 */
+    derB64 = input.replace(/\s+/g,'');
+    if(!/^[A-Za-z0-9+/]+={0,2}$/.test(derB64) || derB64.length < 100){
+      throw new Error('未识别到 PEM 或 Base64 私钥');
+    }
+  }
+  let der = Uint8Array.from(atob(derB64), c => c.charCodeAt(0));
+  let fmt;
+  /* PKCS#8: SEQ{ INTEGER 0(02 01 00) SEQ algId(30 0d…)… }；PKCS#1: SEQ{ INTEGER 0, INTEGER n(02 82…)… } */
+  if(der[4] === 0x02 && der[5] === 0x01 && der[6] === 0x00 && der[7] === 0x30 && der[8] === 0x0d){ fmt = 'PKCS#8'; }
+  else { fmt = 'PKCS#1 → PKCS#8'; der = pkcs1ToPkcs8(der); }
+  const key = await crypto.subtle.importKey('pkcs8', der,
+    {name:'RSASSA-PKCS1-v1_5', hash:{name:'SHA-256'}}, false, ['sign']);
+  const test = await crypto.subtle.sign({name:'RSASSA-PKCS1-v1_5'}, key, new TextEncoder().encode('ping'));
+  const bits = test.byteLength * 8;
+  MCH.der = der; MCH.format = fmt; MCH.bits = bits; MCH._keys = {};
+  updateMchUI();
+  return bits;
+}
+async function getMchSignKey(){
+  if(!MCH.der) throw new Error('尚未导入商户私钥');
+  if(!MCH._keys[MCH.hash]){
+    MCH._keys[MCH.hash] = await crypto.subtle.importKey('pkcs8', MCH.der,
+      {name:'RSASSA-PKCS1-v1_5', hash:{name:MCH.hash}}, false, ['sign']);
+  }
+  return MCH._keys[MCH.hash];
+}
+async function signRaw(rawText){
+  const key = await getMchSignKey();
+  const sig = await crypto.subtle.sign({name:'RSASSA-PKCS1-v1_5'}, key, new TextEncoder().encode(rawText));
+  return b64(new Uint8Array(sig));
+}
+/* ---------- 待签串 ---------- */
+function sortObjDeep(o){
+  if(Array.isArray(o)) return o.map(sortObjDeep);
+  if(o && typeof o === 'object'){
+    const r = {}; Object.keys(o).sort().forEach(k => r[k] = sortObjDeep(o[k])); return r;
+  }
+  return o;
+}
+function buildSignRaw(body, mode){
+  /* 《签名介绍》规则：非空参数值按参数名 ASCII 字典序（区分大小写）key=value&… 拼接 stringA；
+     空值不参与、sign 本身不参与（signType 参与）；extra/detail 等字符串字段按原文拼接；
+     对 stringA 做 RSA 签名并 Base64 编码赋值给 sign */
+  const keys = Object.keys(body)
+    .filter(k => k !== 'sign' && body[k] !== '' && body[k] !== null && body[k] !== undefined)
+    .sort();
+  return keys.map(k => {
+    const v = body[k];
+    const sv = (v && typeof v === 'object') ? JSON.stringify(v) : String(v);
+    return k + '=' + sv;
+  }).join('&');
+}
+/* ---------- 报文签名 ---------- */
+async function applySign(body){
+  if(!MCH.der){
+    body.sign = '<商户服务端使用商户私钥生成>';
+    body.signType = mchSignTypeVal();
+    return {signed:false};
+  }
+  try{
+    body.signType = mchSignTypeVal();          /* 先定 signType 终值，使其按文档规则参与签名 */
+    const raw = buildSignRaw(body, MCH.rawMode);
+    const sign = await signRaw(raw);
+    body.sign = sign;
+    return {signed:true, raw, sign};
+  }catch(e){
+    body.sign = '<签名失败：' + (e.message || e) + '>';
+    body.signType = 'RSA';
+    return {signed:false, error:e.message};
+  }
+}
+function showSignArea(prefix, res){
+  const p = $(prefix + 'SignPanel');
+  if(!p) return;
+  if(!res || !res.signed){ p.style.display = 'none'; return; }
+  $(prefix + 'SignRaw').value = res.raw;
+  $(prefix + 'SignVal').textContent = res.sign;
+  $(prefix + 'SignAlgo').textContent = 'SIGN · RSA-' + (MCH.hash === 'SHA-256' ? 'SHA256' : 'SHA1') + ' · ' + MCH.bits + '-bit · ' + MCH.format;
+  p.style.display = 'block';
+}
+function bindResign(prefix){
+  $('btn-resign' + prefix.charAt(0).toUpperCase() + prefix.slice(1)).addEventListener('click', async () => {
+    if(!MCH.der){ toast('请先在「签名密钥」页导入商户私钥'); return; }
+    const raw = $(prefix + 'SignRaw').value;
+    if(!raw.trim()){ toast('待签串为空'); return; }
+    try{
+      const sign = await signRaw(raw);
+      $(prefix + 'SignVal').textContent = sign;
+      const ta = $(prefix + 'Req');
+      const obj = JSON.parse(ta.value);
+      obj.sign = sign; obj.signType = mchSignTypeVal();
+      ta.value = JSON.stringify(obj, null, 2);
+      toast('已重新签名并回填报文');
+    }catch(e){ toast('签名失败：' + (e.message || e)); }
+  });
+}
+bindResign('pay'); bindResign('card'); bindResign('query');
+
+/* ---------- 签名密钥 UI ---------- */
+function updateMchUI(){
+  const badge = $('mchBadge'), state = $('mch-state');
+  const algoTxt = 'RSA-' + (MCH.hash === 'SHA-256' ? 'SHA256' : 'SHA1');
+  if(MCH.der){
+    badge.innerHTML = '<span class="dot"></span>商户私钥 · ' + MCH.bits + '-bit';
+    state.textContent = '已导入 · ' + MCH.format + ' · ' + MCH.bits + '-bit · 签名算法 ' + algoTxt;
+    state.style.color = 'var(--ok)';
+  }else{
+    badge.innerHTML = '<span class="dot" style="background:#B9BFC8;box-shadow:0 0 0 3px rgba(185,191,200,.2)"></span>商户私钥 · 未配置';
+    state.textContent = '未导入（sign 将以占位值生成）';
+    state.style.color = 'var(--seal)';
+  }
+  $('mch-try-algo').textContent = 'SIGN · ' + algoTxt + ' · BASE64';
+  /* 三个接口页首引导条：随私钥状态切换 */
+  ['guide-pay','guide-card','guide-query'].forEach(id => {
+    const g = $(id);
+    if(!g) return;
+    if(MCH.der){
+      g.classList.add('ok');
+      g.innerHTML = '<div class="g-body">'
+        + '<div class="g-title">签名已就绪</div>'
+        + '<div class="g-row">商户私钥已导入（' + MCH.bits + '-bit · ' + algoTxt + '），可直接生成报文</div>'
+        + '<div class="g-note">生成报文时，待签串与 sign 将自动计算并写入，无需其他设置。</div>'
+        + '</div>';
+    }else{
+      g.classList.remove('ok');
+      g.innerHTML = '<div class="g-body">'
+        + '<div class="g-title">调用前两步（须先完成，再操作本页）</div>'
+        + '<div class="g-row">① 打开顶部「<b>签名密钥</b>」页签</div>'
+        + '<div class="g-row">② 粘贴商户私钥（支持 PEM / 纯 Base64，粘贴即自动导入），并选定签名算法（RSA-SHA256 / RSA-SHA1）</div>'
+        + '<div class="g-note">完成前，本页生成的 sign 为占位值、平台验签不通过。</div>'
+        + '</div>';
+    }
+  });
+}
+/* 粘贴/输入即自动导入（防抖 600ms）；「导入私钥」按钮用于手动触发与重试 */
+let _autoImportTimer = null;
+async function doImport(silent){
+  const input = $('mch-pem').value;
+  if(!input.trim()){ if(!silent) toast('请先粘贴 PEM / Base64 私钥或选择私钥文件'); return; }
+  try{
+    const bits = await importMerchantKey(input);
+    toast('商户私钥已' + (silent ? '自动' : '') + '导入（' + bits + '-bit），生成报文时将自动签名');
+  }catch(e){
+    if(!silent){
+      toast('导入失败：' + (e.message || e));
+    }else if(!MCH.der){
+      const state = $('mch-state');
+      state.textContent = '私钥内容尚未通过校验——完整粘贴后会自动导入，也可点「导入私钥」重试';
+      state.style.color = 'var(--warn)';
+    }
+  }
+}
+$('btn-import-key').addEventListener('click', () => doImport(false));
+$('mch-pem').addEventListener('input', () => {
+  clearTimeout(_autoImportTimer);
+  _autoImportTimer = setTimeout(() => doImport(true), 600);
+});
+$('btn-key-file').addEventListener('click', () => $('mch-file').click());
+$('mch-file').addEventListener('change', e => {
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => { $('mch-pem').value = r.result; toast('已读取 ' + f.name); doImport(false); };
+  r.readAsText(f);
+});
+$('btn-clear-key').addEventListener('click', () => {
+  MCH.der = null; MCH._keys = {}; MCH.bits = 0; MCH.format = '';
+  $('mch-pem').value = ''; $('mch-file').value = '';
+  updateMchUI(); toast('已清除商户私钥');
+});
+document.querySelectorAll('input[name=mch-hash]').forEach(r => r.addEventListener('change', () => {
+  MCH.hash = r.value;
+  if(!MCH._stDirty) $('mch-signtype').value = mchSignTypeDefault();
+  updateMchUI();
+}));
+$('mch-signtype').addEventListener('input', () => {
+  MCH._stDirty = $('mch-signtype').value.trim() !== mchSignTypeDefault();
+});
+$('btn-try-sign').addEventListener('click', async () => {
+  if(!MCH.der){ toast('请先导入商户私钥'); return; }
+  const raw = $('mch-try-raw').value;
+  if(!raw.trim()){ toast('请输入待签名内容'); return; }
+  try{
+    const sign = await signRaw(raw);
+    $('mch-try-out').textContent = sign;
+    toast('签名完成');
+  }catch(e){ toast('签名失败：' + (e.message || e)); }
+});
+$('mchBadge').addEventListener('click', () => {
+  document.querySelector('#tabs button[data-tab="tab-key"]').click();
+});
+updateMchUI();
+
+/* ============================================================
+ * TAB1 · 快捷支付下单
+ * ============================================================ */
+function amountToFen(){
+  const v = parseFloat($('p-amount').value || '0');
+  if(isNaN(v) || v <= 0) return null;
+  return $('p-amountUnit').value === 'yuan' ? Math.round(v * 100) : Math.round(v);
+}
+$('p-amount').addEventListener('input', ()=>{
+  const fen = amountToFen();
+  $('p-amountHint').textContent = fen == null ? '请输入有效金额'
+    : ($('p-amountUnit').value === 'yuan' ? $('p-amount').value + ' 元 = ' + fen + ' 分' : fen + ' 分');
+});
+$('p-amountUnit').addEventListener('change', ()=>{
+  const fen = amountToFen();
+  $('p-amountHint').textContent = fen == null ? '请输入有效金额'
+    : ($('p-amountUnit').value === 'yuan' ? $('p-amount').value + ' 元 = ' + fen + ' 分' : fen + ' 分');
+});
+$('btn-genOrderId').addEventListener('click', ()=>{ $('p-outTradeNo').value = genOrderId(); toast('已生成商户订单号'); });
+$('btn-genTime').addEventListener('click', ()=>{
+  $('p-timeStart').value = genTimeStr(0);
+  $('p-timeExpire').value = genTimeStr(120);
+  toast('已生成：timeStart=当前时间，timeExpire=+2 小时');
+});
+$('btn-detail-demo').addEventListener('click', ()=>{
+  $('p-detail').value = '{"goodsDetails":[{"goodsId":"001","goodsName":"矿泉水","quantity":1,"price":100}]}';
+  toast('已填入 detail 示例，可自行修改');
+});
+
+$('p-idNo').addEventListener('blur', e=>{
+  const v = e.target.value.trim();
+  if(!v) return;
+  const ok = /^\d{15}$/.test(v) || /^\d{17}[\dXx]$/.test(v);
+  e.target.style.borderColor = ok ? '' : 'var(--seal)';
+  if(!ok) toast('身份证号格式疑似有误（15 或 18 位）');
+});
+
+async function buildPayRequest(){
+  const appId = $('p-appId').value.trim(), mchId = $('p-mchId').value.trim();
+  const unionId = $('p-unionId').value.trim();
+  const payerName = $('p-payerName').value.trim(), idNo = $('p-idNo').value.trim();
+  const amount = amountToFen();
+  const outTradeNo = $('p-outTradeNo').value.trim() || genOrderId();
+
+  const miss = [];
+  if(!appId) miss.push('appId'); if(!mchId) miss.push('mchId');
+  if(!unionId) miss.push('unionId');
+  if(amount == null) miss.push('totalFee');
+  if(!$('p-body').value.trim()) miss.push('body');
+  if(!$('p-notifyUrl').value.trim()) miss.push('notifyUrl');
+  if(miss.length){ toast('请先填写：' + miss.join('、')); return null; }
+
+  /* RSA 加密付款人身份（姓名/证件选填：填写的才加密并进入 extra.payer；unionId/openId 明文） */
+  let extra = {};
+  const cipherOut = $('cipherOut');
+  try{
+    const parts = [];
+    const payer = {};
+    const chunkList = [];
+    if(payerName){
+      const c1 = await rsaEncrypt(payerName);
+      payer.name = c1.cipher;
+      chunkList.push(c1.chunks);
+      parts.push('<div class="kv"><span class="k">明文·姓名</span><span class="v" style="color:#8C96A4">' + payerName + '</span></div>');
+      parts.push('<div class="kv"><span class="k">密文·payer.name</span><span class="v" data-cw="name"></span></div>');
+    }else{
+      parts.push('<div class="kv"><span class="k">payer.name</span><span class="v" style="color:#8C96A4">未填写（不加密、不进入 extra）</span></div>');
+    }
+    if(idNo){
+      const c2 = await rsaEncrypt(idNo);
+      payer.idNo = c2.cipher;
+      chunkList.push(c2.chunks);
+      parts.push('<div class="kv"><span class="k">明文·证件</span><span class="v" style="color:#8C96A4">' + idNo + '</span></div>');
+      parts.push('<div class="kv"><span class="k">密文·payer.idNo</span><span class="v" data-cw="idNo"></span></div>');
+    }else{
+      parts.push('<div class="kv"><span class="k">payer.idNo</span><span class="v" style="color:#8C96A4">未填写（不加密、不进入 extra）</span></div>');
+    }
+    cipherOut.innerHTML = parts.join('');
+    const nEl = cipherOut.querySelector('[data-cw=name]');
+    if(nEl) typewriter(nEl, payer.name);
+    const iEl = cipherOut.querySelector('[data-cw=idNo]');
+    if(iEl) setTimeout(()=> typewriter(iEl, payer.idNo), 400);
+    showChunkNote(chunkList);
+    if(payer.name || payer.idNo){
+      const idType = $('p-idType').value.trim();
+      if(idType) payer.idType = idType;
+      if($('p-liveness').checked) payer.needLiveness = 'Y';
+      extra.payer = payer;
+    }
+  }catch(err){
+    toast('RSA 加密失败：' + err.message);
+    return null;
+  }
+
+  /* extra 扩展参数：payer + payRestriction(cardType/bankCodes/cardNoSuffixes) + bindCardEventNotifyUrl */
+  const cardType = $('p-cardType').value;
+  const bankCodesRaw = $('p-bankCodes').value.trim();
+  const cardNoSuffixesRaw = $('p-cardNoSuffixes').value.trim();
+  if(cardType || bankCodesRaw || cardNoSuffixesRaw){
+    const pr = {};
+    if(cardType) pr.cardType = cardType;
+    if(bankCodesRaw) pr.bankCodes = toList(bankCodesRaw);
+    if(cardNoSuffixesRaw) pr.cardNoSuffixes = toList(cardNoSuffixesRaw);
+    extra.payRestriction = pr;
+  }
+  const bcNotify = $('p-bcNotifyUrl').value.trim();
+  if(bcNotify) extra.bindCardEventNotifyUrl = bcNotify;
+  const extraAsStr = document.querySelector('input[name=extrapkg]:checked').value === 'string';
+  if(extraAsStr) extra = JSON.stringify(extra);
+
+  const timeStart = $('p-timeStart').value.trim() || genTimeStr(0);
+  const timeExpire = $('p-timeExpire').value.trim() || genTimeStr(120);
+  $('p-timeStart').value = timeStart;
+  $('p-timeExpire').value = timeExpire;
+
+  const body = {
+    appId: appId,
+    mchId: mchId,
+    outTradeNo: outTradeNo,
+    totalFee: amount,
+    timeStart: timeStart,
+    timeExpire: timeExpire,
+    tradeType: 'MWEB',
+    unionId: unionId,
+    nonceStr: genNonce(),
+    extra: extra,
+    sign: '<商户服务端使用商户私钥生成>',
+    signType: 'RSA'
+  };
+  body.body = $('p-body').value.trim();
+  const an = $('p-appName').value.trim(); if(an) body.appName = an;
+  const ci = $('p-clientIp').value.trim(); if(ci) body.clientIp = ci;
+  const dt = $('p-detail').value.trim(); if(dt) body.detail = dt;
+  body.notifyUrl = $('p-notifyUrl').value.trim();
+  const ru = $('p-returnUrl').value.trim(); if(ru) body.returnUrl = ru;
+  const oi = $('p-openId').value.trim(); if(oi) body.openId = oi;
+
+  const sr = await applySign(body);
+  showSignArea('pay', sr);
+
+  const str = JSON.stringify(body, null, 2);
+  $('payReq').value = str;
+  $('btn-curlPay').dataset.ready = '1';
+  toast(sr.signed ? '报文已生成（sign 已用商户私钥签名）' : '报文已生成（sign 为占位，导入商户私钥后自动签名）');
+  return str;
+}
+function showChunkNote(chunks){
+  const n = $('chunkNote');
+  if(chunks.some(c => c > 1)){
+    n.style.display = 'block';
+    n.innerHTML = '<b>分块加密</b>：明文超过单块上限（117B），已按 100 字节分块并以 <b>|</b> 连接多个 Base64 密文，请确认服务端按相同规则解密。';
+  }else n.style.display = 'none';
+}
+$('btn-buildPay').addEventListener('click', buildPayRequest);
+$('btn-curlPay').addEventListener('click', ()=>{
+  if(!$('payReq').value.trim()){ toast('请先生成报文'); return; }
+  copyText(toCurl(ENV.pay, $('payReq').value), 'cURL 已复制');
+});
+
+/* ---------- 发送请求（通用） ---------- */
+async function sendRequest(url, reqText, panelId, statusId, bodyId, linksId, corsId, afterOk){
+  const panel = $(panelId); panel.style.display = 'block';
+  const statusEl = $(statusId), bodyEl = $(bodyId), linksEl = $(linksId), corsEl = $(corsId);
+  linksEl.innerHTML = ''; corsEl.style.display = 'none';
+  statusEl.innerHTML = '<span class="spin" style="display:inline-block;width:12px;height:12px;border:2px solid #414A55;border-top-color:#E4B95E;border-radius:50%"></span> 请求中…';
+  bodyEl.textContent = '…';
+  document.getElementById(panelId.replace('Panel','')).classList.remove('resp-ok','resp-err');
+
+  let obj = null;
+  try{ obj = JSON.parse(reqText); }
+  catch(e){ toast('报文 JSON 格式有误，请检查编辑内容'); statusEl.textContent = 'ABORT · JSON 无效'; return; }
+
+  try{
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json;charset=UTF-8'},
+      body: JSON.stringify(obj)
+    });
+    const text = await resp.text();
+    let pretty = text;
+    try{ pretty = JSON.stringify(JSON.parse(text), null, 2); }catch(e){}
+    bodyEl.textContent = pretty || '(空响应体)';
+    const ok = resp.ok;
+    statusEl.innerHTML = 'HTTP ' + resp.status + ' ' + (ok ? '<span class="s-ok">✓</span>' : '<span class="s-err">✕</span>');
+    document.getElementById(panelId.replace('Panel','')).classList.add(ok ? 'resp-ok' : 'resp-err');
+
+    /* 提取跳转链接（MWEB 收银台 / 银行卡管理页等） */
+    const links = [];
+    let parsed = null; try{ parsed = JSON.parse(text); }catch(e){}
+    (function walk(v){
+      if(typeof v === 'string' && /^https?:\/\//i.test(v) && !links.includes(v)) links.push(v);
+      else if(v && typeof v === 'object') Object.values(v).forEach(walk);
+    })(parsed);
+    linksEl.innerHTML = links.map((u,i)=>
+      '<button class="linkbtn" data-open="' + u.replace(/"/g,'&quot;') + '">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>' +
+      '<span class="u">' + u + '</span><span style="flex:none;font-family:var(--sans)">打开 ▸</span></button>').join('');
+    linksEl.querySelectorAll('[data-open]').forEach(b=>{
+      b.addEventListener('click', ()=> window.open(b.dataset.open, '_blank'));
+    });
+    if(afterOk) afterOk(parsed, ok);
+  }catch(err){
+    /* TypeError: Failed to fetch → CORS / 网络 */
+    statusEl.innerHTML = '<span class="s-err">✕ 网络请求未送达</span>';
+    bodyEl.textContent = String(err && err.message || err);
+    document.getElementById(panelId.replace('Panel','')).classList.add('resp-err');
+    corsEl.style.display = 'block';
+  }
+}
+$('btn-sendPay').addEventListener('click', ()=>{
+  if(!$('payReq').value.trim()){ toast('请先生成报文'); return; }
+  sendRequest(apiUrl('pay'), $('payReq').value, 'payRespPanel', 'payRespStatus', 'payRespBody', 'payLinks', 'corsNote');
+});
+
+/* ============================================================
+ * TAB2 · 绑卡管理
+ * ============================================================ */
+async function buildCardRequest(){
+  const appId = $('c-appId').value.trim(), mchId = $('c-mchId').value.trim(), unionId = $('c-unionId').value.trim();
+  const nu = $('c-notifyUrl').value.trim();
+  const miss = [];
+  if(!appId) miss.push('appId'); if(!mchId) miss.push('mchId'); if(!unionId) miss.push('unionId'); if(!nu) miss.push('notifyUrl');
+  if(miss.length){ toast('请先填写：' + miss.join('、')); return null; }
+  const body = {appId: appId, mchId: mchId, unionId: unionId};
+  body.nonceStr = genNonce();
+  const oi = $('c-openId').value.trim(); if(oi) body.openId = oi;
+  body.notifyUrl = nu;
+  const ru = $('c-returnUrl').value.trim(); if(ru) body.returnUrl = ru;
+
+  const sr = await applySign(body);
+  showSignArea('card', sr);
+
+  const str = JSON.stringify(body, null, 2);
+  $('cardReq').value = str;
+  toast(sr.signed ? '报文已生成（sign 已用商户私钥签名）' : '报文已生成（sign 为占位，导入商户私钥后自动签名）');
+  return str;
+}
+$('btn-buildCard').addEventListener('click', buildCardRequest);
+$('btn-curlCard').addEventListener('click', ()=>{
+  if(!$('cardReq').value.trim()){ toast('请先生成报文'); return; }
+  copyText(toCurl(ENV.card, $('cardReq').value), 'cURL 已复制');
+});
+$('btn-sendCard').addEventListener('click', ()=>{
+  if(!$('cardReq').value.trim()){ toast('请先生成报文'); return; }
+  sendRequest(apiUrl('card'), $('cardReq').value, 'cardRespPanel', 'cardRespStatus', 'cardRespBody', 'cardLinks', 'cardCorsNote');
+});
+
+/* ============================================================
+ * TAB3 · 会员绑卡查询
+ * ============================================================ */
+async function buildQueryRequest(){
+  const appId = $('q-appId').value.trim(), mchId = $('q-mchId').value.trim(), unionId = $('q-unionId').value.trim();
+  const miss = [];
+  if(!appId) miss.push('appId'); if(!mchId) miss.push('mchId'); if(!unionId) miss.push('unionId');
+  if(miss.length){ toast('请先填写：' + miss.join('、')); return null; }
+  const body = {appId: appId, mchId: mchId, unionId: unionId};
+  body.nonceStr = genNonce();
+  const oi = $('q-openId').value.trim(); if(oi) body.openId = oi;
+  const sm = $('q-subMchId').value.trim(); if(sm) body.subMchId = sm;
+
+  const sr = await applySign(body);
+  showSignArea('query', sr);
+
+  const str = JSON.stringify(body, null, 2);
+  $('queryReq').value = str;
+  toast(sr.signed ? '报文已生成（sign 已用商户私钥签名）' : '报文已生成（sign 为占位，导入商户私钥后自动签名）');
+  return str;
+}
+$('btn-buildQuery').addEventListener('click', buildQueryRequest);
+$('btn-curlQuery').addEventListener('click', ()=>{
+  if(!$('queryReq').value.trim()){ toast('请先生成报文'); return; }
+  copyText(toCurl(ENV.query, $('queryReq').value), 'cURL 已复制');
+});
+$('btn-sendQuery').addEventListener('click', ()=>{
+  if(!$('queryReq').value.trim()){ toast('请先生成报文'); return; }
+  sendRequest(apiUrl('query'), $('queryReq').value, 'queryRespPanel', 'queryRespStatus', 'queryRespBody', 'queryLinks', 'queryCorsNote', renderCardList);
+});
+
+/* cardList（JSON 字符串）→ 银行卡卡片 */
+function renderCardList(parsed, ok){
+  const wrap = $('cardListWrap');
+  wrap.innerHTML = '';
+  if(!ok || !parsed) return;
+  let raw = parsed.cardList;
+  if(typeof raw !== 'string'){ wrap.innerHTML = ''; return; }
+  let list = null;
+  try{ list = JSON.parse(raw); }catch(e){
+    wrap.innerHTML = '<div class="empty-tip">cardList 无法解析为 JSON：' + String(raw).slice(0,120) + '…</div>';
+    return;
+  }
+  if(!Array.isArray(list) || !list.length){
+    wrap.innerHTML = '<div class="empty-tip">该会员暂无已绑定的快捷银行卡</div>';
+    return;
+  }
+  wrap.innerHTML = '<div class="cards">' + list.map(c=>{
+    const type = (c.cardType || '').toUpperCase();
+    const typeText = type === 'CC' ? 'CC · 贷记' : type === 'DC' ? 'DC · 借记' : (type || '未知');
+    const no = c.cardNoMask || c.cardNo || '';
+    let display;
+    if(/^\d{6}\*{4,}\d{4}$|^\d{6}.{2,}\d{4}$/.test(no)){
+      display = '<span>' + no.slice(0,6) + '</span><span class="d"> **** **** </span><span>' + no.slice(-4) + '</span>';
+    }else if(no.length >= 10){
+      display = '<span>' + no.slice(0,6) + '</span><span class="d"> **** **** </span><span>' + no.slice(-4) + '</span>';
+    }else display = no || '****';
+    return '<div class="bankcard">' +
+      '<div class="bc-top"><span class="bc-bank">' + (c.bankName || c.bankCode || '银行') + '</span>' +
+      '<span class="bc-type">' + typeText + '</span></div>' +
+      '<div class="bc-no">' + display + '</div>' +
+      '<div class="bc-foot"><span class="bc-name">' + (c.payerName || c.userName || '持卡人') + '</span>' +
+      '<span class="bc-agr">协议号 <b>' + (c.sdpAgreementNo || '—') + '</b></span></div></div>';
+  }).join('') + '</div>';
+}
+
+</script>
+</body>
+</html>
